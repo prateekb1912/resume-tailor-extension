@@ -1,0 +1,21 @@
+{
+  "manifest_version": 3,
+  "name": "Resume Tailor",
+  "version": "1.0.0",
+  "description": "Extract job descriptions and trigger n8n to tailor your resume",
+
+  "permissions": [
+    "activeTab",
+    "scripting",
+    "downloads",
+    "storage"
+  ],
+
+  "host_permissions": [
+    "http://localhost:5678/*"
+  ],
+
+  "action": {
+    "default_popup": "popup.html"
+  }
+}
