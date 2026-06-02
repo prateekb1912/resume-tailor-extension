@@ -234,12 +234,72 @@ async function init() {
 }
 
 function maybeEnableTailorBtn() {
-  chrome.storage.local.get(STORAGE_KEY_PROFILE, (stored) => {
+  chrome.storage.local.get([STORAGE_KEY_PROFILE, 'tailorResult'], (stored) => {
     const hasProfile = !!stored[STORAGE_KEY_PROFILE];
     const hasJD      = jobData && jobData.description.length >= 100;
-    document.getElementById('tailor-btn').disabled = !(hasProfile && hasJD);
-    if (hasProfile && hasJD) setTailorStatus('Ready to tailor.');
+    const tr         = stored.tailorResult;
+
+    // Treat pending as stale if it's been running for over 3 minutes
+    const isStuckPending = tr?.status === 'pending' &&
+      tr.startedAt && (Date.now() - tr.startedAt) > 180_000;
+
+    if (isStuckPending) {
+      chrome.storage.local.remove('tailorResult');
+    }
+
+    const pending = tr?.status === 'pending' && !isStuckPending;
+    const btn     = document.getElementById('tailor-btn');
+    btn.disabled  = !(hasProfile && hasJD) || pending;
+
+    if (pending) {
+      btn.classList.add('loading');
+      setTailorStatus('Processing in background…');
+    } else if (tr?.status === 'done') {
+      applyResult(tr.result);
+    } else if (tr?.status === 'error') {
+      setTailorStatus(`Error: ${tr.error}`, 'error');
+      btn.textContent = 'Retry';
+      chrome.storage.local.remove('tailorResult');
+    } else if (hasProfile && hasJD) {
+      setTailorStatus('Ready to tailor.');
+    }
   });
+}
+
+function applyResult(result) {
+  console.log('[resume-tailor] applyResult received:', JSON.stringify(result).slice(0, 200));
+
+  const btn   = document.getElementById('tailor-btn');
+  const dlBtn = document.getElementById('download-btn');
+
+  btn.textContent = 'Tailor Again';
+  btn.classList.remove('loading');
+  btn.disabled = false;
+
+  if (downloadHandler) dlBtn.removeEventListener('click', downloadHandler);
+  downloadHandler = null;
+
+  if (result?.downloadUrl) {
+    downloadHandler = () => chrome.tabs.create({ url: result.downloadUrl });
+  } else if (result?.fileData) {
+    const mime     = result.mimeType || 'application/pdf';
+    const ext      = mime.includes('pdf') ? 'pdf' : mime.includes('html') ? 'html' : 'docx';
+    const fileName = result.fileName || `resume_tailored.${ext}`;
+    downloadHandler = () => {
+      const blob = base64ToBlob(result.fileData, mime);
+      const url  = URL.createObjectURL(blob);
+      chrome.downloads.download({ url, filename: fileName });
+    };
+  }
+
+  if (downloadHandler) {
+    setTailorStatus('Resume tailored — ready to download.', 'success');
+    dlBtn.classList.add('visible');
+    dlBtn.addEventListener('click', downloadHandler);
+  } else {
+    console.warn('[resume-tailor] no downloadable field in result:', result);
+    setTailorStatus('Done, but no file returned. Check the service worker console.', 'error');
+  }
 }
 
 // ── Tailor button ─────────────────────────────────────────────────────────────
@@ -261,72 +321,38 @@ document.getElementById('tailor-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.classList.add('loading');
   dlBtn.classList.remove('visible');
-  if (downloadHandler) dlBtn.removeEventListener('click', downloadHandler);
-  setTailorStatus('Sending to n8n — this may take a minute…');
+  chrome.storage.local.remove('tailorResult');
+  setTailorStatus('Running in background — you can close this popup.');
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  // Delegate to background service worker so fetch survives popup close
+  chrome.runtime.sendMessage({
+    action:     'startTailor',
+    webhookUrl,
+    body: {
+      resumeProfile:  profile,
+      jobTitle:       jobData.title,
+      company:        jobData.company,
+      jobDescription: jobData.description,
+      jobUrl:         jobData.url,
+      timestamp:      new Date().toISOString(),
+    },
+  });
 
-  try {
-    const response = await fetch(webhookUrl, {
-      method:  'POST',
-      headers: { 'Content-Type': 'application/json' },
-      signal:  controller.signal,
-      body: JSON.stringify({
-        resumeProfile:  profile,
-        jobTitle:       jobData.title,
-        company:        jobData.company,
-        jobDescription: jobData.description,
-        jobUrl:         jobData.url,
-        timestamp:      new Date().toISOString(),
-      }),
-    });
-
-    clearTimeout(timer);
-
-    if (!response.ok) {
-      const body = await response.text().catch(() => '');
-      throw new Error(`n8n returned ${response.status}${body ? ': ' + body.slice(0, 120) : ''}`);
+  // Poll storage every 3s while popup is open
+  const poll = setInterval(async () => {
+    const s = await chrome.storage.local.get('tailorResult');
+    if (s.tailorResult?.status === 'done') {
+      clearInterval(poll);
+      applyResult(s.tailorResult.result);
+    } else if (s.tailorResult?.status === 'error') {
+      clearInterval(poll);
+      setTailorStatus(`Error: ${s.tailorResult.error}`, 'error');
+      btn.classList.remove('loading');
+      btn.textContent = 'Retry';
+      btn.disabled = false;
+      chrome.storage.local.remove('tailorResult');
     }
-
-    const result = await response.json();
-
-    setTailorStatus('Resume tailored successfully!', 'success');
-    btn.textContent = 'Tailor Again';
-    btn.classList.remove('loading');
-    btn.disabled = false;
-
-    if (result.downloadUrl) {
-      downloadHandler = () => chrome.tabs.create({ url: result.downloadUrl });
-      dlBtn.classList.add('visible');
-      dlBtn.addEventListener('click', downloadHandler);
-
-    } else if (result.fileData) {
-      const mime     = result.mimeType || 'application/pdf';
-      const ext      = mime.includes('pdf') ? 'pdf' : 'docx';
-      const fileName = result.fileName || `resume_tailored.${ext}`;
-      downloadHandler = () => {
-        const blob = base64ToBlob(result.fileData, mime);
-        const url  = URL.createObjectURL(blob);
-        chrome.downloads.download({ url, filename: fileName });
-      };
-      dlBtn.classList.add('visible');
-      dlBtn.addEventListener('click', downloadHandler);
-
-    } else {
-      setTailorStatus(result.message || 'Done! Check your output.', 'success');
-    }
-
-  } catch (err) {
-    clearTimeout(timer);
-    const msg = err.name === 'AbortError'
-      ? 'Timed out after 2 minutes. Is n8n running?'
-      : `Error: ${err.message}`;
-    setTailorStatus(msg, 'error');
-    btn.classList.remove('loading');
-    btn.textContent = 'Retry';
-    btn.disabled = false;
-  }
+  }, 3000);
 });
 
 init();

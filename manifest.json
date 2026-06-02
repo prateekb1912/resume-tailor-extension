@@ -8,8 +8,13 @@
     "activeTab",
     "scripting",
     "downloads",
-    "storage"
+    "storage",
+    "notifications"
   ],
+
+  "background": {
+    "service_worker": "background.js"
+  },
 
   "host_permissions": [
     "http://localhost:5678/*"
