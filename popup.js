@@ -4,8 +4,15 @@ const STORAGE_KEY_PROFILE    = 'resumeProfile';
 const STORAGE_KEY_WEBHOOK    = 'webhookUrl';
 const TIMEOUT_MS             = 120_000;
 
-let jobData        = null;
+let jobData         = null;
 let downloadHandler = null;
+let siteKey         = null;
+
+// Per-site storage key so each job site keeps its own tailor session
+// instead of overwriting a single shared result.
+function tailorKey() {
+  return siteKey ? `tailorResult:${siteKey}` : 'tailorResult';
+}
 
 // ── JD extraction (runs in page context) ─────────────────────────────────────
 
@@ -58,7 +65,50 @@ function extractJobInfo() {
   }
 
   if (!description) description = document.body.innerText.slice(0, 10000);
-  if (!title)       title       = document.title;
+
+  // ── Generic fallbacks for title/company on unhandled sites ──
+  // 1. schema.org JobPosting JSON-LD — embedded by most ATS/career pages.
+  function fromJsonLd() {
+    for (const el of document.querySelectorAll('script[type="application/ld+json"]')) {
+      try {
+        const data = JSON.parse(el.textContent);
+        const nodes = Array.isArray(data) ? data : (data['@graph'] || [data]);
+        for (const node of nodes) {
+          const t = node && node['@type'];
+          const isJob = t === 'JobPosting' || (Array.isArray(t) && t.includes('JobPosting'));
+          if (isJob) {
+            const org = node.hiringOrganization;
+            return { title: node.title || '', company: (typeof org === 'string' ? org : org?.name) || '' };
+          }
+        }
+      } catch { /* malformed JSON-LD — skip */ }
+    }
+    return null;
+  }
+
+  // 2. Split a page title like "Senior Software Engineer | Okta" into parts.
+  function fromDocTitle() {
+    const parts = (document.title || '').split(/\s+[|–—\-]\s+/);
+    return parts.length >= 2
+      ? { title: parts[0].trim(), company: parts[parts.length - 1].trim() }
+      : { title: (document.title || '').trim(), company: '' };
+  }
+
+  const ld = fromJsonLd();
+  if (ld) {
+    if (!title)   title   = ld.title;
+    if (!company) company = ld.company;
+  }
+  if (!company) company = document.querySelector('meta[property="og:site_name"]')?.content?.trim() || company;
+  const dt = fromDocTitle();
+  if (!title)   title   = dt.title;
+  if (!company) company = dt.company;
+
+  // Strip a trailing "| Company" / "- Company" the page title often glues on.
+  if (company && title) {
+    const esc = company.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    title = title.replace(new RegExp('\\s*[|\\u2013\\u2014\\-]\\s*' + esc + '\\s*$', 'i'), '').trim();
+  }
 
   return {
     title:       title.replace(/\s+/g, ' ').trim(),
@@ -69,6 +119,13 @@ function extractJobInfo() {
 }
 
 // ── Helpers ───────────────────────────────────────────────────────────────────
+
+// Keep the char-count label in sync with whatever's in the editable JD field.
+function syncJdChars() {
+  const chars = (jobData?.description || '').length;
+  document.getElementById('jd-chars').textContent =
+    chars >= 100 ? `${chars.toLocaleString()} chars` : (chars ? `${chars} chars — looks short` : '');
+}
 
 function setParseStatus(msg, type = '') {
   const el = document.getElementById('parse-status');
@@ -95,6 +152,147 @@ function profileSummary(profile) {
   if (profile.skills?.length)     parts.push(`${profile.skills.length} skills`);
   if (profile.education?.length)  parts.push(profile.education[0].degree || profile.education[0].school || '');
   return parts.filter(Boolean).join(' · ');
+}
+
+// ── Match score (client-side heuristic) ───────────────────────────────────────
+//
+// Frequency-ranking the JD just surfaces boilerplate ("jobs", "experience",
+// "team"). Instead we only ever consider terms that are recognized *skills* —
+// the union of a built-in tech vocabulary and the user's own resume skills.
+// Everything else in the page text is ignored, so generic words can't leak in.
+
+// Built-in skill/technology vocabulary. Multi-word entries are matched as phrases.
+const SKILL_VOCAB = [
+  'javascript','typescript','python','java','c++','c#','c','go','golang','rust','ruby','php','scala','kotlin',
+  'swift','objective-c','perl','r','matlab','dart','elixir','haskell','lua','bash','shell','powershell','sql',
+  'html','css','sass','scss','tailwind','bootstrap',
+  'react','react native','redux','next.js','nextjs','vue','vuejs','angular','svelte','jquery','ember','backbone',
+  'node.js','nodejs','express','nestjs','deno','bun',
+  'django','flask','fastapi','rails','ruby on rails','spring','spring boot','laravel','symfony','asp.net','.net','dotnet',
+  'graphql','rest','grpc','websocket','soap','microservices','serverless','api',
+  'postgresql','postgres','mysql','sqlite','mariadb','oracle','sql server','mongodb','dynamodb','cassandra','redis',
+  'elasticsearch','neo4j','couchdb','firebase','supabase','snowflake','bigquery','redshift','databricks',
+  'aws','amazon web services','azure','gcp','google cloud','heroku','digitalocean','cloudflare','vercel','netlify',
+  'docker','kubernetes','k8s','terraform','ansible','pulumi','helm','vagrant','openshift','nomad',
+  'jenkins','github actions','gitlab ci','circleci','travis','argocd','ci/cd','cicd',
+  'git','github','gitlab','bitbucket','svn','mercurial',
+  'kafka','rabbitmq','sqs','pubsub','nats','airflow','spark','hadoop','flink','dbt','etl',
+  'linux','unix','windows','macos','nginx','apache','prometheus','grafana','datadog','splunk','sentry','elk',
+  'pytorch','tensorflow','keras','scikit-learn','sklearn','pandas','numpy','opencv','huggingface','langchain',
+  'machine learning','deep learning','nlp','computer vision','llm','generative ai','data science','data engineering',
+  'tableau','power bi','looker','dbt',
+  'jest','mocha','cypress','playwright','selenium','pytest','junit','vitest','testing','tdd',
+  'figma','sketch','adobe xd','photoshop','illustrator',
+  'jira','confluence','agile','scrum','kanban','devops','sre','observability',
+  'webpack','vite','babel','rollup','esbuild','turbopack',
+  'oauth','jwt','saml','sso','rbac','encryption','security',
+];
+
+const STOPWORDS = new Set(('a an the and or but for nor so yet of to in on at by with from as is are was ' +
+  'were be been being have has had do does did will would shall should can could may might must this that ' +
+  'these those it its their our your you we they he she them his her not no will able strong years').split(/\s+/));
+
+// Normalize common synonyms so JS == JavaScript, k8s == kubernetes, etc.
+const SYNONYMS = {
+  js: 'javascript', ts: 'typescript', py: 'python', golang: 'go', k8s: 'kubernetes',
+  postgres: 'postgresql', nextjs: 'next.js', nodejs: 'node.js', vuejs: 'vue',
+  sklearn: 'scikit-learn', cicd: 'ci/cd', gcp: 'google cloud', dotnet: '.net', sre: 'devops',
+};
+const canon = (t) => SYNONYMS[t] || t;
+
+const SKILL_SET    = new Set(SKILL_VOCAB.map(canon));
+const SKILL_PHRASES = SKILL_VOCAB.filter(s => s.includes(' '));
+
+function tokenize(text) {
+  return (text || '')
+    .toLowerCase()
+    .replace(/[^a-z0-9+#./\s-]/g, ' ')
+    .split(/\s+/)
+    .map(w => w.replace(/^[.\-]+|[.\-]+$/g, ''))
+    .filter(Boolean);
+}
+
+// Extract the set of recognized skills mentioned in a blob of text.
+function skillsIn(text, extraVocab) {
+  const lower = (text || '').toLowerCase();
+  const found = new Set();
+
+  // Multi-word skills: substring match on the raw text.
+  for (const phrase of SKILL_PHRASES) {
+    if (lower.includes(phrase)) found.add(canon(phrase));
+  }
+  // Single-word skills: token match against the known set.
+  for (const tok of tokenize(text)) {
+    const c = canon(tok);
+    if (SKILL_SET.has(c) || extraVocab.has(c)) found.add(c);
+  }
+  return found;
+}
+
+// The resume's declared skills become part of the recognized vocabulary, so a
+// JD term the user actually lists always counts even if it's niche.
+function resumeSkillVocab(profile) {
+  const vocab = new Set();
+  for (const s of (profile.skills || [])) {
+    const c = canon(String(s).toLowerCase().trim());
+    if (c && !STOPWORDS.has(c)) vocab.add(c);
+  }
+  return vocab;
+}
+
+// Returns { score: 0-100, present: [...], missing: [...] }
+function computeMatch(profile, jd) {
+  const resumeText = [
+    profile.summary,
+    (profile.skills || []).join(' '),
+    (profile.certifications || []).join(' '),
+    (profile.experience || []).flatMap(e => [e.title, ...(e.bullets || [])]).join(' '),
+    (profile.projects || []).flatMap(p => [p.name, p.description, ...(p.bullets || [])]).join(' '),
+  ].join(' ');
+
+  const resumeVocab  = resumeSkillVocab(profile);
+  const resumeSkills = skillsIn(resumeText, resumeVocab);
+  const jdSkills     = skillsIn(jd.description, resumeVocab);
+
+  if (!jdSkills.size) return { score: 0, present: [], missing: [] };
+
+  const present = [...jdSkills].filter(s => resumeSkills.has(s));
+  const missing = [...jdSkills].filter(s => !resumeSkills.has(s));
+
+  // Coverage of the role's required skills, lightly curved.
+  const coverage = present.length / jdSkills.size;
+  const score = Math.round(Math.min(100, Math.pow(coverage, 0.85) * 100));
+
+  return { score, present, missing: missing.slice(0, 6) };
+}
+
+function renderMatch(profile) {
+  const box = document.getElementById('match');
+  if (!profile || !jobData || jobData.description.length < 100) {
+    box.classList.remove('visible');
+    return;
+  }
+
+  const { score, present, missing } = computeMatch(profile, jobData);
+
+  // No recognized skills found (e.g. JD fell back to whole-page noise) — hide
+  // rather than show a misleading 0%.
+  if (!present.length && !missing.length) {
+    box.classList.remove('visible');
+    return;
+  }
+
+  const color = score >= 70 ? '#16a34a' : score >= 45 ? '#d97706' : '#dc2626';
+
+  document.getElementById('match-pct').textContent   = `${score}%`;
+  document.getElementById('match-pct').style.color   = color;
+  document.getElementById('match-fill').style.width  = `${score}%`;
+  document.getElementById('match-fill').style.background = color;
+  document.getElementById('match-note').textContent = missing.length
+    ? `Missing skills: ${missing.join(', ')}`
+    : `Covers all ${present.length} detected skills.`;
+
+  box.classList.add('visible');
 }
 
 // ── Resume profile card ───────────────────────────────────────────────────────
@@ -194,6 +392,14 @@ async function init() {
     document.getElementById('tailor-btn').disabled = true;
   });
 
+  // Let the user manually fix/paste the JD if extraction came up short.
+  document.getElementById('jd-preview').addEventListener('input', (e) => {
+    if (!jobData) jobData = { title: '', company: '', description: '', url: '' };
+    jobData.description = e.target.value.trim();
+    syncJdChars();
+    maybeEnableTailorBtn();
+  });
+
   // Load stored webhook URL
   const stored = await chrome.storage.local.get([STORAGE_KEY_WEBHOOK, STORAGE_KEY_PROFILE]);
   document.getElementById('webhook-url').value = stored[STORAGE_KEY_WEBHOOK] || DEFAULT_TAILOR_WEBHOOK;
@@ -215,15 +421,15 @@ async function init() {
     });
 
     jobData = result;
+    try { siteKey = new URL(jobData.url).hostname; } catch { siteKey = null; }
     document.getElementById('jd-title').textContent   = jobData.title   || 'Unknown position';
     document.getElementById('jd-company').textContent = jobData.company || '';
-    document.getElementById('jd-preview').textContent = jobData.description;
+    document.getElementById('jd-preview').value        = jobData.description;
+    syncJdChars();
 
-    const chars = jobData.description.length;
-    document.getElementById('jd-chars').textContent =
-      chars >= 100 ? `${chars.toLocaleString()} chars extracted` : '';
-
-    if (chars < 100) setTailorStatus('Very little text found — open a job posting first.', 'error');
+    if (jobData.description.length < 100) {
+      setTailorStatus('Very little text found — edit or paste the job description above.', 'error');
+    }
 
   } catch (err) {
     document.getElementById('jd-title').textContent = 'Could not read page';
@@ -234,17 +440,19 @@ async function init() {
 }
 
 function maybeEnableTailorBtn() {
-  chrome.storage.local.get([STORAGE_KEY_PROFILE, 'tailorResult'], (stored) => {
+  chrome.storage.local.get([STORAGE_KEY_PROFILE, tailorKey()], (stored) => {
     const hasProfile = !!stored[STORAGE_KEY_PROFILE];
     const hasJD      = jobData && jobData.description.length >= 100;
-    const tr         = stored.tailorResult;
+    const tr         = stored[tailorKey()];
+
+    renderMatch(stored[STORAGE_KEY_PROFILE]);
 
     // Treat pending as stale if it's been running for over 3 minutes
     const isStuckPending = tr?.status === 'pending' &&
       tr.startedAt && (Date.now() - tr.startedAt) > 180_000;
 
     if (isStuckPending) {
-      chrome.storage.local.remove('tailorResult');
+      chrome.storage.local.remove(tailorKey());
     }
 
     const pending = tr?.status === 'pending' && !isStuckPending;
@@ -259,7 +467,7 @@ function maybeEnableTailorBtn() {
     } else if (tr?.status === 'error') {
       setTailorStatus(`Error: ${tr.error}`, 'error');
       btn.textContent = 'Retry';
-      chrome.storage.local.remove('tailorResult');
+      chrome.storage.local.remove(tailorKey());
     } else if (hasProfile && hasJD) {
       setTailorStatus('Ready to tailor.');
     }
@@ -321,13 +529,14 @@ document.getElementById('tailor-btn').addEventListener('click', async () => {
   btn.disabled = true;
   btn.classList.add('loading');
   dlBtn.classList.remove('visible');
-  chrome.storage.local.remove('tailorResult');
+  chrome.storage.local.remove(tailorKey());
   setTailorStatus('Running in background — you can close this popup.');
 
   // Delegate to background service worker so fetch survives popup close
   chrome.runtime.sendMessage({
     action:     'startTailor',
     webhookUrl,
+    resultKey:  tailorKey(),
     body: {
       resumeProfile:  profile,
       jobTitle:       jobData.title,
@@ -339,18 +548,19 @@ document.getElementById('tailor-btn').addEventListener('click', async () => {
   });
 
   // Poll storage every 3s while popup is open
+  const key = tailorKey();
   const poll = setInterval(async () => {
-    const s = await chrome.storage.local.get('tailorResult');
-    if (s.tailorResult?.status === 'done') {
+    const s = await chrome.storage.local.get(key);
+    if (s[key]?.status === 'done') {
       clearInterval(poll);
-      applyResult(s.tailorResult.result);
-    } else if (s.tailorResult?.status === 'error') {
+      applyResult(s[key].result);
+    } else if (s[key]?.status === 'error') {
       clearInterval(poll);
-      setTailorStatus(`Error: ${s.tailorResult.error}`, 'error');
+      setTailorStatus(`Error: ${s[key].error}`, 'error');
       btn.classList.remove('loading');
       btn.textContent = 'Retry';
       btn.disabled = false;
-      chrome.storage.local.remove('tailorResult');
+      chrome.storage.local.remove(key);
     }
   }, 3000);
 });

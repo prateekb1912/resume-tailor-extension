@@ -100,25 +100,46 @@
     .jd-title { font-size: 14px; font-weight: 600; color: #111; line-height: 1.3; }
     .jd-company { font-size: 12px; color: #6b7280; margin-top: 2px; }
     .jd-preview {
+      display: block;
+      width: 100%;
+      box-sizing: border-box;
       background: #f9fafb;
       border: 1px solid #e5e7eb;
       border-radius: 6px;
       padding: 8px 10px;
       font-size: 11px;
-      color: #6b7280;
+      color: #374151;
       line-height: 1.5;
-      max-height: 60px;
-      overflow: hidden;
+      height: 90px;
+      resize: vertical;
+      overflow: auto;
       margin-top: 8px;
-      position: relative;
+      font-family: inherit;
     }
-    .jd-preview::after {
-      content: '';
-      position: absolute;
-      bottom: 0; left: 0; right: 0; height: 20px;
-      background: linear-gradient(transparent, #f9fafb);
+    .jd-preview:focus {
+      outline: none;
+      border-color: #6366f1;
+      background: #fff;
     }
     .jd-chars { font-size: 10px; color: #9ca3af; margin-top: 4px; }
+
+    /* ── Match score ── */
+    .match {
+      display: none;
+      margin-top: 10px;
+    }
+    .match.visible { display: block; }
+    .match-head {
+      display: flex; align-items: baseline; justify-content: space-between;
+      margin-bottom: 4px;
+    }
+    .match-label { font-size: 11px; font-weight: 600; color: #374151; }
+    .match-pct { font-size: 13px; font-weight: 700; }
+    .match-bar {
+      height: 6px; border-radius: 3px; background: #f1f1f4; overflow: hidden;
+    }
+    .match-fill { height: 100%; width: 0; border-radius: 3px; transition: width 0.4s ease; }
+    .match-note { font-size: 10px; color: #9ca3af; margin-top: 4px; }
 
     /* ── Settings ── */
     .settings-row { display: flex; align-items: center; gap: 8px; }
@@ -226,8 +247,17 @@
       <div class="section-label">Job Detected</div>
       <div class="jd-title" id="jd-title">Detecting…</div>
       <div class="jd-company" id="jd-company"></div>
-      <div class="jd-preview" id="jd-preview"></div>
+      <textarea class="jd-preview" id="jd-preview" spellcheck="false" placeholder="Job description — edit or paste here if extraction missed it."></textarea>
       <div class="jd-chars" id="jd-chars"></div>
+
+      <div class="match" id="match">
+        <div class="match-head">
+          <span class="match-label">Resume match</span>
+          <span class="match-pct" id="match-pct">—</span>
+        </div>
+        <div class="match-bar"><div class="match-fill" id="match-fill"></div></div>
+        <div class="match-note" id="match-note"></div>
+      </div>
     </div>
 
     <hr>
