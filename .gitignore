@@ -1,0 +1,14 @@
+# OS
+.DS_Store
+
+# n8n workflow exports — kept local, not committed
+workflows/
+
+# Python / server
+server/.venv/
+__pycache__/
+*.py[cod]
+.pytest_cache/
+.ruff_cache/
+server/.env
+.env
