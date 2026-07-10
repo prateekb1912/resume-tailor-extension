@@ -28,10 +28,10 @@ async function runTailor(webhookUrl, body, resultKey = 'tailorResult') {
 
   try {
     const response = await fetch(webhookUrl, {
-      method:  'POST',
+      method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      signal:  controller.signal,
-      body:    JSON.stringify(body),
+      signal: controller.signal,
+      body: JSON.stringify(body),
     });
 
     clearTimeout(timer);
@@ -46,9 +46,9 @@ async function runTailor(webhookUrl, body, resultKey = 'tailorResult') {
 
     // Read raw bytes once, then sniff — don't trust the content-type header,
     // since n8n's binary webhook response may mislabel or omit it.
-    const buf  = await response.arrayBuffer();
+    const buf = await response.arrayBuffer();
     const head = new Uint8Array(buf.slice(0, 5));
-    const isPdf    = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46; // %PDF
+    const isPdf = head[0] === 0x25 && head[1] === 0x50 && head[2] === 0x44 && head[3] === 0x46; // %PDF
     const looksJson = contentType.includes('application/json') && !isPdf;
 
     if (looksJson) {
@@ -79,10 +79,10 @@ async function runTailor(webhookUrl, body, resultKey = 'tailorResult') {
     });
 
     chrome.notifications.create('tailor-done', {
-      type:    'basic',
+      type: 'basic',
       iconUrl: 'icon48.png',
-      title:   'Resume Tailor',
-      message: 'Your tailored resume is ready — click the extension to download.',
+      title: 'Tailr',
+      message: 'Your tailored resume is ready. Click the extension to download.',
     });
 
   } catch (err) {
@@ -95,9 +95,9 @@ async function runTailor(webhookUrl, body, resultKey = 'tailorResult') {
     });
 
     chrome.notifications.create('tailor-error', {
-      type:    'basic',
+      type: 'basic',
       iconUrl: 'icon48.png',
-      title:   'Resume Tailor',
+      title: 'Tailr',
       message: `Failed: ${msg}`,
     });
   }

@@ -1,9 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "Resume Tailor",
+  "name": "Tailr",
   "version": "1.0.0",
-  "description": "Extract job descriptions and trigger n8n to tailor your resume",
-
+  "description": "Read the job description on a page and tailor your resume to it.",
   "permissions": [
     "activeTab",
     "scripting",
@@ -11,15 +10,12 @@
     "storage",
     "notifications"
   ],
-
   "background": {
     "service_worker": "background.js"
   },
-
   "host_permissions": [
     "http://localhost:5678/*"
   ],
-
   "action": {
     "default_popup": "popup.html"
   }

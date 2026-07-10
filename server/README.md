@@ -1,4 +1,4 @@
-# Resume Tailor — Server
+# Tailr — Server
 
 FastAPI backend. Python 3.11+, managed with [uv](https://docs.astral.sh/uv/).
 

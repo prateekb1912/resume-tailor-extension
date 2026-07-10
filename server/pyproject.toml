@@ -1,7 +1,7 @@
 [project]
-name = "resume-tailor-server"
+name = "tailr-server"
 version = "0.1.0"
-description = "Resume Tailor backend — auth, resume parsing, and JD-tailored resume generation"
+description = "Tailr backend — auth, resume parsing, and JD-tailored resume generation"
 requires-python = ">=3.11"
 dependencies = [
     "fastapi",

@@ -1,6 +1,6 @@
-# Resume Tailor
+# Tailr
 
-Monorepo for the Resume Tailor product.
+Monorepo for the Tailr product — tailor your resume to any job description.
 
 ## Layout
 

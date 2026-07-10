@@ -1,9 +1,14 @@
 <!DOCTYPE html>
 <html>
+
 <head>
   <meta charset="UTF-8">
   <style>
-    * { box-sizing: border-box; margin: 0; padding: 0; }
+    * {
+      box-sizing: border-box;
+      margin: 0;
+      padding: 0;
+    }
 
     body {
       width: 360px;
@@ -21,10 +26,26 @@
       align-items: center;
       gap: 8px;
     }
-    .header h1 { font-size: 14px; font-weight: 600; }
-    .header .dot { width: 8px; height: 8px; border-radius: 50%; background: #93c5fd; flex-shrink: 0; }
 
-    .body { padding: 14px 16px; display: flex; flex-direction: column; gap: 12px; }
+    .header h1 {
+      font-size: 14px;
+      font-weight: 600;
+    }
+
+    .header .dot {
+      width: 8px;
+      height: 8px;
+      border-radius: 50%;
+      background: #93c5fd;
+      flex-shrink: 0;
+    }
+
+    .body {
+      padding: 14px 16px;
+      display: flex;
+      flex-direction: column;
+      gap: 12px;
+    }
 
     /* ── Section label ── */
     .section-label {
@@ -44,8 +65,18 @@
     }
 
     /* empty state */
-    .resume-empty { display: flex; flex-direction: column; gap: 8px; }
-    .file-pick { display: flex; align-items: center; gap: 8px; }
+    .resume-empty {
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+
+    .file-pick {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
     .file-pick-btn {
       padding: 4px 10px;
       font-size: 11px;
@@ -57,9 +88,23 @@
       white-space: nowrap;
       flex-shrink: 0;
     }
-    .file-pick-btn:hover { background: #f3f4f6; }
-    .file-name { font-size: 11px; color: #9ca3af; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
-    .file-name.selected { color: #1e40af; }
+
+    .file-pick-btn:hover {
+      background: #f3f4f6;
+    }
+
+    .file-name {
+      font-size: 11px;
+      color: #9ca3af;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .file-name.selected {
+      color: #1e40af;
+    }
+
     .parse-btn {
       width: 100%;
       padding: 7px;
@@ -71,34 +116,102 @@
       color: #374151;
       cursor: pointer;
     }
-    .parse-btn:hover:not(:disabled) { background: #e5e7eb; }
-    .parse-btn:disabled { opacity: 0.5; cursor: not-allowed; }
-    .parse-status { font-size: 11px; color: #6b7280; min-height: 14px; }
-    .parse-status.error { color: #dc2626; }
-    .parse-status.success { color: #16a34a; }
+
+    .parse-btn:hover:not(:disabled) {
+      background: #e5e7eb;
+    }
+
+    .parse-btn:disabled {
+      opacity: 0.5;
+      cursor: not-allowed;
+    }
+
+    .parse-status {
+      font-size: 11px;
+      color: #6b7280;
+      min-height: 14px;
+    }
+
+    .parse-status.error {
+      color: #dc2626;
+    }
+
+    .parse-status.success {
+      color: #16a34a;
+    }
 
     /* loaded state */
-    .resume-loaded { display: none; }
-    .resume-loaded.visible { display: flex; align-items: flex-start; gap: 10px; }
-    .resume-check {
-      width: 20px; height: 20px; border-radius: 50%;
-      background: #dcfce7; color: #16a34a;
-      display: flex; align-items: center; justify-content: center;
-      font-size: 11px; flex-shrink: 0; margin-top: 1px;
+    .resume-loaded {
+      display: none;
     }
-    .resume-meta { flex: 1; min-width: 0; }
-    .resume-name { font-weight: 600; font-size: 13px; color: #111; }
-    .resume-stats { font-size: 11px; color: #6b7280; margin-top: 2px; }
-    .resume-update {
-      font-size: 11px; color: #6b7280; background: none; border: none;
-      cursor: pointer; padding: 0; text-decoration: underline; flex-shrink: 0;
+
+    .resume-loaded.visible {
+      display: flex;
+      align-items: flex-start;
+      gap: 10px;
+    }
+
+    .resume-check {
+      width: 20px;
+      height: 20px;
+      border-radius: 50%;
+      background: #dcfce7;
+      color: #16a34a;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      flex-shrink: 0;
+      margin-top: 1px;
+    }
+
+    .resume-meta {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .resume-name {
+      font-weight: 600;
+      font-size: 13px;
+      color: #111;
+    }
+
+    .resume-stats {
+      font-size: 11px;
+      color: #6b7280;
       margin-top: 2px;
     }
-    .resume-update:hover { color: #374151; }
+
+    .resume-update {
+      font-size: 11px;
+      color: #6b7280;
+      background: none;
+      border: none;
+      cursor: pointer;
+      padding: 0;
+      text-decoration: underline;
+      flex-shrink: 0;
+      margin-top: 2px;
+    }
+
+    .resume-update:hover {
+      color: #374151;
+    }
 
     /* ── JD section ── */
-    .jd-title { font-size: 14px; font-weight: 600; color: #111; line-height: 1.3; }
-    .jd-company { font-size: 12px; color: #6b7280; margin-top: 2px; }
+    .jd-title {
+      font-size: 14px;
+      font-weight: 600;
+      color: #111;
+      line-height: 1.3;
+    }
+
+    .jd-company {
+      font-size: 12px;
+      color: #6b7280;
+      margin-top: 2px;
+    }
+
     .jd-preview {
       display: block;
       width: 100%;
@@ -116,34 +229,80 @@
       margin-top: 8px;
       font-family: inherit;
     }
+
     .jd-preview:focus {
       outline: none;
       border-color: #6366f1;
       background: #fff;
     }
-    .jd-chars { font-size: 10px; color: #9ca3af; margin-top: 4px; }
+
+    .jd-chars {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
 
     /* ── Match score ── */
     .match {
       display: none;
       margin-top: 10px;
     }
-    .match.visible { display: block; }
+
+    .match.visible {
+      display: block;
+    }
+
     .match-head {
-      display: flex; align-items: baseline; justify-content: space-between;
+      display: flex;
+      align-items: baseline;
+      justify-content: space-between;
       margin-bottom: 4px;
     }
-    .match-label { font-size: 11px; font-weight: 600; color: #374151; }
-    .match-pct { font-size: 13px; font-weight: 700; }
-    .match-bar {
-      height: 6px; border-radius: 3px; background: #f1f1f4; overflow: hidden;
+
+    .match-label {
+      font-size: 11px;
+      font-weight: 600;
+      color: #374151;
     }
-    .match-fill { height: 100%; width: 0; border-radius: 3px; transition: width 0.4s ease; }
-    .match-note { font-size: 10px; color: #9ca3af; margin-top: 4px; }
+
+    .match-pct {
+      font-size: 13px;
+      font-weight: 700;
+    }
+
+    .match-bar {
+      height: 6px;
+      border-radius: 3px;
+      background: #f1f1f4;
+      overflow: hidden;
+    }
+
+    .match-fill {
+      height: 100%;
+      width: 0;
+      border-radius: 3px;
+      transition: width 0.4s ease;
+    }
+
+    .match-note {
+      font-size: 10px;
+      color: #9ca3af;
+      margin-top: 4px;
+    }
 
     /* ── Settings ── */
-    .settings-row { display: flex; align-items: center; gap: 8px; }
-    .settings-row label { font-size: 11px; color: #6b7280; white-space: nowrap; }
+    .settings-row {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+    }
+
+    .settings-row label {
+      font-size: 11px;
+      color: #6b7280;
+      white-space: nowrap;
+    }
+
     .settings-row input {
       flex: 1;
       font-size: 11px;
@@ -153,7 +312,10 @@
       color: #374151;
       outline: none;
     }
-    .settings-row input:focus { border-color: #3b82f6; }
+
+    .settings-row input:focus {
+      border-color: #3b82f6;
+    }
 
     /* ── Main action ── */
     .tailor-btn {
@@ -169,19 +331,44 @@
       transition: background 0.15s;
       position: relative;
     }
-    .tailor-btn:hover:not(:disabled) { background: #1d4ed8; }
-    .tailor-btn:disabled { background: #93c5fd; cursor: not-allowed; }
-    .tailor-btn.loading { color: transparent; }
-    .tailor-btn.loading::after {
-      content: 'Tailoring resume…';
-      position: absolute; inset: 0;
-      display: flex; align-items: center; justify-content: center;
-      color: white; font-size: 13px;
+
+    .tailor-btn:hover:not(:disabled) {
+      background: #1d4ed8;
     }
 
-    .tailor-status { font-size: 12px; color: #6b7280; min-height: 16px; }
-    .tailor-status.error { color: #dc2626; }
-    .tailor-status.success { color: #16a34a; }
+    .tailor-btn:disabled {
+      background: #93c5fd;
+      cursor: not-allowed;
+    }
+
+    .tailor-btn.loading {
+      color: transparent;
+    }
+
+    .tailor-btn.loading::after {
+      content: 'Tailoring resume…';
+      position: absolute;
+      inset: 0;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: white;
+      font-size: 13px;
+    }
+
+    .tailor-status {
+      font-size: 12px;
+      color: #6b7280;
+      min-height: 16px;
+    }
+
+    .tailor-status.error {
+      color: #dc2626;
+    }
+
+    .tailor-status.success {
+      color: #16a34a;
+    }
 
     .download-btn {
       display: none;
@@ -195,18 +382,30 @@
       font-weight: 500;
       cursor: pointer;
     }
-    .download-btn:hover { background: #166534; }
-    .download-btn.visible { display: block; }
 
-    hr { border: none; border-top: 1px solid #f3f4f6; }
+    .download-btn:hover {
+      background: #166534;
+    }
 
-    input[type="file"] { display: none; }
+    .download-btn.visible {
+      display: block;
+    }
+
+    hr {
+      border: none;
+      border-top: 1px solid #f3f4f6;
+    }
+
+    input[type="file"] {
+      display: none;
+    }
   </style>
 </head>
+
 <body>
   <div class="header">
     <div class="dot"></div>
-    <h1>Resume Tailor</h1>
+    <h1>Tailr</h1>
   </div>
 
   <div class="body">
@@ -221,7 +420,8 @@
           <div class="file-pick">
             <button class="file-pick-btn" id="file-pick-btn">Choose file</button>
             <span class="file-name" id="file-name">PDF or DOCX</span>
-            <input type="file" id="resume-file" accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            <input type="file" id="resume-file"
+              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
           </div>
           <button class="parse-btn" id="parse-btn" disabled>Parse &amp; Save Resume</button>
           <div class="parse-status" id="parse-status"></div>
@@ -247,7 +447,8 @@
       <div class="section-label">Job Detected</div>
       <div class="jd-title" id="jd-title">Detecting…</div>
       <div class="jd-company" id="jd-company"></div>
-      <textarea class="jd-preview" id="jd-preview" spellcheck="false" placeholder="Job description — edit or paste here if extraction missed it."></textarea>
+      <textarea class="jd-preview" id="jd-preview" spellcheck="false"
+        placeholder="Job description — edit or paste here if extraction missed it."></textarea>
       <div class="jd-chars" id="jd-chars"></div>
 
       <div class="match" id="match">
@@ -255,7 +456,9 @@
           <span class="match-label">Resume match</span>
           <span class="match-pct" id="match-pct">—</span>
         </div>
-        <div class="match-bar"><div class="match-fill" id="match-fill"></div></div>
+        <div class="match-bar">
+          <div class="match-fill" id="match-fill"></div>
+        </div>
         <div class="match-note" id="match-note"></div>
       </div>
     </div>
@@ -277,4 +480,5 @@
 
   <script src="popup.js"></script>
 </body>
+
 </html>
