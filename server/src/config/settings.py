@@ -4,8 +4,6 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
 class Settings(BaseSettings):
-    """Single source of truth for config — no magic strings elsewhere."""
-
     model_config = SettingsConfigDict(env_file=".env", extra="ignore")
 
     app_name: str = "Resume Tailor API"
