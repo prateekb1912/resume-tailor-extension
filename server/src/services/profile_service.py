@@ -1,8 +1,11 @@
 import io
 
+from sqlalchemy.orm import Session
+
 from fastapi import HTTPException, status
 from pypdf import PdfReader
 
+from src.models.profile import Profile
 from src.schemas.profile import ProfileData
 from src.services import llm
 
@@ -21,7 +24,13 @@ def _extract_pdf_text(file_bytes: bytes) -> str:
     return text
 
 
-def parse_resume(file_bytes: bytes) -> ProfileData:
+def parse_resume(file_bytes: bytes, db: Session) -> ProfileData:
     text = _extract_pdf_text(file_bytes)
     raw = llm.extract_resume(text)
-    return ProfileData.model_validate(raw)
+    profile_data = ProfileData.model_validate(raw)
+    profile = Profile(data=profile_data.model_dump())
+
+    db.add(profile)
+    db.commit()
+
+    return profile_data
