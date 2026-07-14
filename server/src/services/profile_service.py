@@ -28,7 +28,9 @@ def parse_resume(file_bytes: bytes, db: Session) -> ProfileData:
     text = _extract_pdf_text(file_bytes)
     raw = llm.extract_resume(text)
     profile_data = ProfileData.model_validate(raw)
-    profile = Profile(data=profile_data.model_dump())
+    profile = Profile(
+        data=profile_data.model_dump(), name=profile_data.name, email=profile_data.email
+    )
 
     db.add(profile)
     db.commit()
