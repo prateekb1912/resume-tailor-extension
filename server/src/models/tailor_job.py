@@ -12,8 +12,8 @@ from src.models.base import Base, TimestampMixin, UUIDMixin
 class TailorJob(Base, UUIDMixin, TimestampMixin):
     __tablename__ = "tailor_jobs"
 
-    user_id: Mapped[uuid.UUID] = mapped_column(
-        UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), index=True
+    profile_id: Mapped[uuid.UUID] = mapped_column(
+        UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), index=True
     )
     status: Mapped[TailorStatus] = mapped_column(
         SAEnum(TailorStatus, name="tailor_status"), default=TailorStatus.PENDING
