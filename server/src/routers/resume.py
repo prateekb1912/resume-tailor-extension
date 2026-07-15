@@ -5,7 +5,7 @@ from fastapi import APIRouter, File, HTTPException, UploadFile, status, Depends
 
 from src.config.database import get_db
 from src.config.settings import settings
-from src.schemas.profile import ProfileResponse
+from src.schemas.profile import ProfileResponse, TailorResumePayload
 from src.services import profile_service
 
 router = APIRouter()
@@ -30,4 +30,16 @@ def parse_resume(
     return ProfileResponse.model_validate(profile)
 
 
-# @router.post("/tailor", response_model=)
+@router.post("/tailor")
+def tailor_resume_to_job(payload: TailorResumePayload, db: Session = Depends(get_db)):
+    if not payload.job_description or len(payload.job_description) < 100:
+        raise HTTPException(
+            status_code=status.HTTP_411_LENGTH_REQUIRED,
+            detail="Job description not found or too short to tailor resume",
+        )
+    if not payload.email:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND, detail="Please provide email for latest profile"
+        )
+
+    return profile_service.tailor_resume_to_job(payload, db)

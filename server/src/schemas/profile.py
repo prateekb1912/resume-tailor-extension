@@ -57,3 +57,21 @@ class ProfileResponse(BaseModel):
 
 class ProfileIn(BaseModel):
     email: EmailStr
+
+
+class FitAssessment(BaseModel):
+    match_score: int = Field(ge=0, le=100)
+    reason: str
+    missing_skills: list[str]
+
+
+class TailorResumePayload(BaseModel):
+    email: EmailStr
+    job_title: str = ""
+    company: str = ""
+    job_description: str = ""
+
+
+class TailoredResumeResult(BaseModel):
+    profile: ProfileData
+    fit: FitAssessment

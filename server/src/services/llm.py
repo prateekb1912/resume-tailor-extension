@@ -1,11 +1,15 @@
+import json
+
 from typing import Any
 
 from langchain.agents import create_agent
 from langchain_openai import ChatOpenAI
+from langchain_anthropic import ChatAnthropic
 from pydantic import SecretStr
 
-from src.schemas.profile import ProfileData
+from src.schemas.profile import ProfileData, TailoredResumeResult
 from src.config.settings import settings
+from src.config.enums import ModelNames
 
 _PARSE_SYSTEM_PROMPT = (
     "You are a precise resume parser. Extract the candidate's resume into the given "
@@ -13,13 +17,110 @@ _PARSE_SYSTEM_PROMPT = (
     "invent, infer, or embellish any information."
 )
 
+_TAILOR_RESUME_PROMPT = """
+    You are a senior recruiter, resume tailor, and strict job-fit screener for {company}.
+
+    Your job is to tailor the resume profile for this specific role and assess how well
+    the candidate fits it. Perform both tasks in one response.
+
+    Follow these rules strictly:
+
+    **ANALYSIS (internal, do not output):**
+    - Identify the top 5 missing keywords from the JD that are absent or underrepresented in the resume
+    - Identify up to 3 red flags a hiring manager would spot in under 10 seconds
+    - Score the candidate against the JD using only evidence in the original resume
+    - Identify the job title and hiring company. Use the provided values if they look
+      correct; otherwise infer them from the job description. Return the company's plain
+      brand name (for example, "Okta", not "Okta, Inc.")
+
+    **FIT SCREENING RULES:**
+    - Judge required skills: compare the JD's must-have hard skills, tools, and
+      technologies with what the original resume demonstrates
+    - Judge experience: compare required years, seniority, and level with the candidate's
+      demonstrated experience
+    - Judge domain alignment with the candidate's background
+    - Judge location compatibility. The candidate is based in Bengaluru, India and is
+      open to roles located in India or fully remote
+    - Produce an integer match score from 0 to 100
+    - Set decision to "REJECT" if the match score is below 60, the candidate is missing
+      the majority of must-have hard skills, or the required experience clearly exceeds
+      theirs; otherwise set it to "PROCEED"
+    - Keep the fit assessment honest. Do not increase the score based on wording added
+      during tailoring; score only capabilities supported by the original resume
+
+    **REWRITING RULES:**
+    - Rewrite every bullet point using the XYZ formula: "Accomplished [X] as measured by [Y] by doing [Z]" — make it specific, quantified where possible, but not necessarily use Accomplished everytime to avoid repetition
+    - Naturally weave in the missing keywords across the summary, bullets, and skills — never keyword-stuff, always contextually accurate
+    - Remove or reframe any red flags (gaps, vague language, irrelevant roles, weak verbs)
+    - Rewrite the summary to speak directly to this role and company
+    - If any experience doesn't have any summary, don't add anything on your own
+    - Reorder skills — most relevant to this JD first
+    - Every bullet must earn its place
+    - Do NOT invent experience, titles, companies, dates, or credentials
+    - Only add a skill if it appears in the experience/projects or is a direct sub-technology of an existing skill
+    - Keep all dates, titles, and company names exactly as-is
+    **OUTPUT:**
+    Return ONLY raw JSON matching the configured structured-output schema. It must contain:
+    - profile: the tailored resume in the same structure as the input profile
+    - fit: an object containing decision, match_score, reason, missing_skills, title,
+      and company
+
+    Keep reason to one or two sentences. missing_skills must contain only missing
+    must-have skills, or an empty list when none are missing. Do not return markdown,
+    explanations, a preamble, or the internal analysis.
+
+    Job Title: {job_title}
+    Company: {company}
+
+    Job Description:
+    {job_description}
+
+    Resume Profile:
+    {resume_profile}
+"""
+
 
 def extract_resume(text: str) -> dict[str, Any]:
-    model = ChatOpenAI(model="gpt-5.5", api_key=SecretStr(settings.openai_api_key))
+    model = ChatOpenAI(model=ModelNames.GPT_5_5, api_key=SecretStr(settings.openai_api_key))
     agent = create_agent(
         model=model,
         system_prompt=_PARSE_SYSTEM_PROMPT,
         response_format=ProfileData,
     )
     response = agent.invoke({"messages": [{"role": "user", "content": f"Resume text:\n\n{text}"}]})
+    return response["structured_response"]
+
+
+def tailor_resume(company: str, job_title: str, job_description: str, profile: ProfileData):
+    system_prompt = _TAILOR_RESUME_PROMPT.format(
+        job_title=job_title,
+        company=company,
+        job_description=job_description,
+        resume_profile=profile.model_dump_json(),
+    )
+    model = ChatAnthropic(
+        model_name=ModelNames.CLAUDE_SONNET_5,
+        api_key=SecretStr(settings.anthropic_api_key),
+        timeout=None,
+        stop=None,
+    )
+
+    agent = create_agent(
+        model=model, system_prompt=system_prompt, response_format=TailoredResumeResult
+    )
+
+    response = agent.invoke(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        "Tailor the resume for the provided role and assess the candidate's "
+                        "fit. Return only the configured structured response."
+                    ),
+                }
+            ]
+        }
+    )
+
     return response["structured_response"]

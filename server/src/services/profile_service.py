@@ -7,7 +7,7 @@ from fastapi import HTTPException, status
 from pypdf import PdfReader
 
 from src.models.profile import Profile
-from src.schemas.profile import ProfileData
+from src.schemas.profile import ProfileData, TailorResumePayload
 from src.services import llm
 
 logger = logging.getLogger(__name__)
@@ -47,3 +47,16 @@ def get_profile(email: str, db: Session) -> Profile:
         raise NameError(f"No profile found with the associated email: {email}")
 
     return profile
+
+
+def tailor_resume_to_job(payload: TailorResumePayload, db: Session):
+    try:
+        profile = get_profile(payload.email, db)
+    except Exception as _:
+        raise NameError(f"No profile found with the associated email: {payload.email}")
+
+    profile_data = ProfileData.model_validate(profile.data)
+
+    return llm.tailor_resume(
+        payload.company, payload.job_title, payload.job_description, profile_data
+    )
