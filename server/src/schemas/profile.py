@@ -68,6 +68,7 @@ class TailorResumePayload(BaseModel):
     job_title: str = ""
     company: str = ""
     job_description: str = ""
+    job_url: str = ""
 
 
 class TailoredResumeResult(BaseModel):

@@ -65,6 +65,7 @@ def tailor_resume_to_job(payload: TailorResumePayload, db: Session) -> TailoredR
     tailor_job = TailorJob(
         profile_id=profile.id,
         job_title=payload.job_title,
+        job_url=payload.job_url,
         company=payload.company,
         jd_text=payload.job_description,
         result_data=tailored_resume.profile.model_dump(),
