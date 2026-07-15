@@ -27,4 +27,7 @@ def parse_resume(
             detail="File too large",
         )
     profile = profile_service.create_profile_with_resume(file_bytes, db)
-    return ProfileResponse(data=profile)
+    return ProfileResponse.model_validate(profile)
+
+
+# @router.post("/tailor", response_model=)

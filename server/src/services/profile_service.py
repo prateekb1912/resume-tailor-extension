@@ -41,8 +41,6 @@ def create_profile_with_resume(file_bytes: bytes, db: Session) -> ProfileData:
 
 
 def get_profile(email: str, db: Session) -> Profile:
-    logger.info(email)
-
     profile = db.query(Profile).filter(Profile.email == email).one_or_none()
 
     if profile is None:

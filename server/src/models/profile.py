@@ -13,3 +13,6 @@ class Profile(Base, UUIDMixin, TimestampMixin):
     data: Mapped[dict[str, ProfileData]] = mapped_column(JSONB)
     name: Mapped[str] = mapped_column(String(32), nullable=True)
     email: Mapped[str] = mapped_column(String(32), nullable=True)
+
+    def to_dict(self):
+        return {c.key: getattr(self, c.key) for c in self.__mapper__.column_attrs}

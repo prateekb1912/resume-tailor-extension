@@ -51,6 +51,8 @@ class ProfileData(BaseModel):
 
 class ProfileResponse(BaseModel):
     data: ProfileData
+    name: str = ""
+    email: EmailStr = ""
 
 
 class ProfileIn(BaseModel):
