@@ -1,7 +1,8 @@
 from typing import Annotated
 from sqlalchemy.orm import Session
 
-from fastapi import APIRouter, File, HTTPException, UploadFile, status, Depends
+from fastapi import APIRouter, File, HTTPException, UploadFile, status, Depends, Form
+from pydantic import EmailStr
 
 from src.config.database import get_db
 from src.config.settings import settings
@@ -13,7 +14,9 @@ router = APIRouter()
 
 @router.post("/parse", response_model=ProfileResponse)
 def parse_resume(
-    resume: Annotated[UploadFile, File()], db: Session = Depends(get_db)
+    resume: Annotated[UploadFile, File()],
+    email: Annotated[EmailStr, Form()],
+    db: Session = Depends(get_db),
 ) -> ProfileResponse:
     if resume.content_type != "application/pdf":
         raise HTTPException(
@@ -26,7 +29,7 @@ def parse_resume(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="File too large",
         )
-    profile = profile_service.create_profile_with_resume(file_bytes, db)
+    profile = profile_service.create_profile_with_resume(email, file_bytes, db)
     return ProfileResponse.model_validate(profile)
 
 

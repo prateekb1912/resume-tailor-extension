@@ -27,32 +27,33 @@ def _extract_pdf_text(file_bytes: bytes) -> str:
     return text
 
 
-def create_profile_with_resume(file_bytes: bytes, db: Session) -> ProfileData:
+def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> ProfileData:
     text = _extract_pdf_text(file_bytes)
     raw = llm.extract_resume(text)
     profile_data = ProfileData.model_validate(raw)
-    profile = Profile(
-        data=profile_data.model_dump(), name=profile_data.name, email=profile_data.email
-    )
 
-    db.add(profile)
+    profile = get_profile(email, db)
+
+    if not profile:
+        profile = Profile(email=profile_data.email)
+        db.add(profile)
+
+    profile.data = profile_data.model_dump()
+    profile.name = profile_data.name
+
     db.commit()
     return profile_data
 
 
-def get_profile(email: str, db: Session) -> Profile:
+def get_profile(email: str, db: Session) -> Profile | None:
     profile = db.query(Profile).filter(Profile.email == email).one_or_none()
-
-    if profile is None:
-        raise NameError(f"No profile found with the associated email: {email}")
 
     return profile
 
 
 def tailor_resume_to_job(payload: TailorResumePayload, db: Session):
-    try:
-        profile = get_profile(payload.email, db)
-    except Exception as _:
+    profile = get_profile(payload.email, db)
+    if not profile:
         raise NameError(f"No profile found with the associated email: {payload.email}")
 
     profile_data = ProfileData.model_validate(profile.data)
