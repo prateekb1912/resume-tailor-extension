@@ -1,11 +1,12 @@
 import uuid
 
-from sqlalchemy import Enum as SAEnum
-from sqlalchemy import ForeignKey, LargeBinary, String, Text
+from sqlalchemy import Enum as SAEnum, ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import JSONB
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
 from src.config.enums import TailorStatus
+from src.schemas.profile import ProfileData
 from src.models.base import Base, TimestampMixin, UUIDMixin
 
 
@@ -28,7 +29,6 @@ class TailorJob(Base, UUIDMixin, TimestampMixin):
     reason: Mapped[str | None] = mapped_column(Text)
     missing_skills: Mapped[str | None] = mapped_column(Text)
 
-    result_pdf: Mapped[bytes | None] = mapped_column(LargeBinary)
-    result_filename: Mapped[str | None] = mapped_column(String(500))
+    result_data: Mapped[dict[str, ProfileData]] = mapped_column(JSONB)
 
     error: Mapped[str | None] = mapped_column(Text)

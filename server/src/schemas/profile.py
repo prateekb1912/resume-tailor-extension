@@ -29,8 +29,6 @@ class Project(BaseModel):
 
 
 class ProfileData(BaseModel):
-    """Structured resume. All fields optional so imperfect LLM output still validates."""
-
     model_config = ConfigDict(extra="ignore")
 
     name: str = ""

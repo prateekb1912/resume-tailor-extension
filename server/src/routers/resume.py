@@ -30,7 +30,7 @@ def parse_resume(
             detail="File too large",
         )
     profile = profile_service.create_profile_with_resume(email, file_bytes, db)
-    return ProfileResponse.model_validate(profile)
+    return ProfileResponse(data=profile, name=profile.name, email=profile.email)
 
 
 @router.post("/tailor")
