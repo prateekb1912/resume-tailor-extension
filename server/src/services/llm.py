@@ -1,5 +1,3 @@
-import json
-
 from typing import Any
 
 from langchain.agents import create_agent
@@ -91,7 +89,9 @@ def extract_resume(text: str) -> dict[str, Any]:
     return response["structured_response"]
 
 
-def tailor_resume(company: str, job_title: str, job_description: str, profile: ProfileData):
+def tailor_resume(
+    company: str, job_title: str, job_description: str, profile: ProfileData
+) -> TailoredResumeResult:
     system_prompt = _TAILOR_RESUME_PROMPT.format(
         job_title=job_title,
         company=company,

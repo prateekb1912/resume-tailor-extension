@@ -6,8 +6,8 @@ from sqlalchemy.orm import Session
 from fastapi import HTTPException, status
 from pypdf import PdfReader
 
-from src.models.profile import Profile
-from src.schemas.profile import ProfileData, TailorResumePayload
+from src.models import Profile, TailorJob
+from src.schemas.profile import ProfileData, TailorResumePayload, TailoredResumeResult
 from src.services import llm
 
 logger = logging.getLogger(__name__)
@@ -51,13 +51,28 @@ def get_profile(email: str, db: Session) -> Profile | None:
     return profile
 
 
-def tailor_resume_to_job(payload: TailorResumePayload, db: Session):
+def tailor_resume_to_job(payload: TailorResumePayload, db: Session) -> TailoredResumeResult:
     profile = get_profile(payload.email, db)
     if not profile:
         raise NameError(f"No profile found with the associated email: {payload.email}")
 
     profile_data = ProfileData.model_validate(profile.data)
 
-    return llm.tailor_resume(
+    tailored_resume = llm.tailor_resume(
         payload.company, payload.job_title, payload.job_description, profile_data
     )
+
+    tailor_job = TailorJob(
+        profile_id=profile.id,
+        job_title=payload.job_title,
+        company=payload.company,
+        jd_text=payload.job_description,
+        result_data=tailored_resume.profile.model_dump(),
+        match_score=tailored_resume.fit.match_score,
+        reason=tailored_resume.fit.reason,
+        missing_skills=tailored_resume.fit.missing_skills,
+    )
+    db.add(tailor_job)
+    db.commit()
+
+    return tailored_resume

@@ -1,11 +1,10 @@
 import uuid
 
-from sqlalchemy import Enum as SAEnum, ForeignKey, String, Text
-from sqlalchemy.dialects.postgresql import JSONB
+from sqlalchemy import ForeignKey, String, Text
+from sqlalchemy.dialects.postgresql import JSONB, ARRAY
 from sqlalchemy.dialects.postgresql import UUID
 from sqlalchemy.orm import Mapped, mapped_column
 
-from src.config.enums import TailorStatus
 from src.schemas.profile import ProfileData
 from src.models.base import Base, TimestampMixin, UUIDMixin
 
@@ -16,9 +15,6 @@ class TailorJob(Base, UUIDMixin, TimestampMixin):
     profile_id: Mapped[uuid.UUID] = mapped_column(
         UUID(as_uuid=True), ForeignKey("profiles.id", ondelete="CASCADE"), index=True
     )
-    status: Mapped[TailorStatus] = mapped_column(
-        SAEnum(TailorStatus, name="tailor_status"), default=TailorStatus.PENDING
-    )
 
     job_title: Mapped[str] = mapped_column(String(500))
     company: Mapped[str] = mapped_column(String(500))
@@ -27,8 +23,6 @@ class TailorJob(Base, UUIDMixin, TimestampMixin):
 
     match_score: Mapped[int | None]
     reason: Mapped[str | None] = mapped_column(Text)
-    missing_skills: Mapped[str | None] = mapped_column(Text)
+    missing_skills: Mapped[list[str] | None] = mapped_column(ARRAY(String))
 
     result_data: Mapped[dict[str, ProfileData]] = mapped_column(JSONB)
-
-    error: Mapped[str | None] = mapped_column(Text)
