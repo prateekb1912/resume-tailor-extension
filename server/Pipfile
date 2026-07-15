@@ -20,6 +20,7 @@ langchain = "*"
 "langchain[google-genai]" = "*"
 # Pinned — newer httpx breaks the async test client setup.
 httpx = "==0.27.2"
+"pydantic[email]" = "*"
 
 [dev-packages]
 pytest = "*"

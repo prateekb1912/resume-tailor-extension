@@ -26,5 +26,5 @@ def parse_resume(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="File too large",
         )
-    profile = profile_service.parse_resume(file_bytes, db)
+    profile = profile_service.create_profile_with_resume(file_bytes, db)
     return ProfileResponse(data=profile)

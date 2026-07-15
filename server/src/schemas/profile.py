@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field
+from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
 
 class Experience(BaseModel):
@@ -51,3 +51,7 @@ class ProfileData(BaseModel):
 
 class ProfileResponse(BaseModel):
     data: ProfileData
+
+
+class ProfileIn(BaseModel):
+    email: EmailStr
