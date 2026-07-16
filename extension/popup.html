@@ -410,6 +410,12 @@
 
   <div class="body">
 
+    <!-- Account email (keys your profile on the server) -->
+    <div class="settings-row">
+      <label>Email</label>
+      <input type="email" id="user-email" placeholder="you@example.com" autocomplete="email">
+    </div>
+
     <!-- Resume profile -->
     <div>
       <div class="section-label">Resume Profile</div>
@@ -419,9 +425,8 @@
         <div class="resume-empty" id="resume-empty">
           <div class="file-pick">
             <button class="file-pick-btn" id="file-pick-btn">Choose file</button>
-            <span class="file-name" id="file-name">PDF or DOCX</span>
-            <input type="file" id="resume-file"
-              accept=".pdf,.docx,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document">
+            <span class="file-name" id="file-name">PDF only</span>
+            <input type="file" id="resume-file" accept=".pdf,application/pdf">
           </div>
           <button class="parse-btn" id="parse-btn" disabled>Parse &amp; Save Resume</button>
           <div class="parse-status" id="parse-status"></div>
@@ -465,10 +470,10 @@
 
     <hr>
 
-    <!-- Webhook -->
+    <!-- Server -->
     <div class="settings-row">
-      <label>Webhook</label>
-      <input type="text" id="webhook-url" placeholder="http://localhost:5678/webhook/resume-tailor">
+      <label>Server</label>
+      <input type="text" id="server-url" placeholder="http://localhost:8000">
     </div>
 
     <!-- Action -->
@@ -478,6 +483,7 @@
 
   </div>
 
+  <script src="vendor/jspdf.umd.min.js"></script>
   <script src="popup.js"></script>
 </body>
 
