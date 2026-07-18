@@ -2,6 +2,7 @@ const DEFAULT_SERVER = 'http://localhost:8000';
 const STORAGE_KEY_PROFILE = 'resumeProfile';
 const STORAGE_KEY_SERVER = 'serverUrl';
 const STORAGE_KEY_EMAIL = 'userEmail';
+const STORAGE_KEY_PRINT = 'printProfile';
 const TIMEOUT_MS = 120_000;
 
 const parseUrl = (base) => `${(base || DEFAULT_SERVER).replace(/\/$/, '')}/resume/parse`;
@@ -87,8 +88,14 @@ function extractJobInfo() {
 
   if (!description) description = document.body.innerText.slice(0, 10000);
 
-  // ── Generic fallbacks for title/company on unhandled sites ──
-  // 1. schema.org JobPosting JSON-LD — embedded by most ATS/career pages.
+  // ── Generic fallbacks for title/company ──
+  // Layered by reliability; each site uses whatever structured data it exposes,
+  // falling back to document.title only as a last resort. All synchronous — no
+  // network, no LLM.
+  const meta = (sel) => document.querySelector(sel)?.getAttribute('content')?.trim() || '';
+
+  // 1. schema.org JobPosting JSON-LD — the SEO-driven gold standard (career
+  //    pages, Greenhouse boards, Indeed, Glassdoor).
   function fromJsonLd() {
     for (const el of document.querySelectorAll('script[type="application/ld+json"]')) {
       try {
@@ -104,26 +111,73 @@ function extractJobInfo() {
         }
       } catch { /* malformed JSON-LD — skip */ }
     }
-    return null;
+    return {};
   }
 
-  // 2. Split a page title like "Senior Software Engineer | Okta" into parts.
+  // 2. Microdata — same schema, inline itemprop encoding. Only trust it inside a
+  //    JobPosting scope so unrelated microdata can't leak in.
+  function fromMicrodata() {
+    const scope = document.querySelector('[itemtype*="JobPosting"]');
+    if (!scope) return {};
+    const q = (sel) => scope.querySelector(sel)?.textContent?.trim().replace(/\s+/g, ' ') || '';
+    return {
+      title: q('[itemprop="title"]'),
+      company: q('[itemprop="hiringOrganization"] [itemprop="name"]') || q('[itemprop="hiringOrganization"]'),
+    };
+  }
+
+  // 3. Open Graph / social meta. LinkedIn's public view is a special, very
+  //    parseable case: "<Company> hiring <Title> in <Location> | LinkedIn".
+  function fromOg() {
+    const ogTitle = meta('meta[property="og:title"], meta[name="og:title"], meta[name="title"]');
+    const li = ogTitle.match(/^(.+?)\s+hiring\s+(.+?)\s+in\s+.+$/i);
+    if (li) return { title: li[2].trim(), company: li[1].trim() };
+
+    let t = ogTitle;
+    let c = meta('meta[property="og:site_name"]');
+    const m = ogTitle.match(/^(.*?)\s+(?:at|@|[|–—-])\s+(.+)$/i);   // "<Title> at <Company>"
+    if (m) {
+      t = m[1].trim();
+      if (!c) c = m[2].trim();
+    }
+    return { title: t, company: c };
+  }
+
+  // 4. Company slug from a known ATS URL — the most reliable company source when
+  //    present (the SPA sites that lack JSON-LD still put company in the URL).
+  function fromUrl() {
+    const h = window.location.hostname;
+    const seg = window.location.pathname.split('/').filter(Boolean);
+    const prettify = (s) => s.replace(/[-_]+/g, ' ').replace(/\b\w/g, (ch) => ch.toUpperCase()).trim();
+    let slug = '';
+    if (h.includes('greenhouse.io') || h.includes('lever.co') || h.includes('ashbyhq.com') || h.includes('smartrecruiters.com')) {
+      slug = seg[0] || '';
+    } else if (h.includes('myworkdayjobs.com') || h.endsWith('.bamboohr.com')) {
+      slug = h.split('.')[0];
+    }
+    return slug ? prettify(slug) : '';
+  }
+
+  // 5. The most prominent heading — usually the job title.
+  function fromHeading() {
+    return document.querySelector('h1')?.innerText?.trim().replace(/\s+/g, ' ') || '';
+  }
+
+  // 6. Split a page title like "Senior Software Engineer | Okta" (last resort).
   function fromDocTitle() {
-    const parts = (document.title || '').split(/\s+[|–—\-]\s+/);
+    const parts = (document.title || '').split(/\s+[|–—-]\s+/);
     return parts.length >= 2
       ? { title: parts[0].trim(), company: parts[parts.length - 1].trim() }
       : { title: (document.title || '').trim(), company: '' };
   }
 
   const ld = fromJsonLd();
-  if (ld) {
-    if (!title) title = ld.title;
-    if (!company) company = ld.company;
-  }
-  if (!company) company = document.querySelector('meta[property="og:site_name"]')?.content?.trim() || company;
+  const micro = fromMicrodata();
+  const og = fromOg();
   const dt = fromDocTitle();
-  if (!title) title = dt.title;
-  if (!company) company = dt.company;
+
+  if (!title) title = ld.title || micro.title || og.title || fromHeading() || dt.title;
+  if (!company) company = ld.company || micro.company || og.company || fromUrl() || dt.company;
 
   // Strip a trailing "| Company" / "- Company" the page title often glues on.
   if (company && title) {
@@ -305,12 +359,21 @@ async function init() {
     document.getElementById('tailor-btn').disabled = true;
   });
 
-  // Let the user manually fix/paste the JD if extraction came up short.
+  // Let the user manually fix/paste any field if extraction came up short.
+  const ensureJobData = () => (jobData ??= { title: '', company: '', description: '', url: '' });
+
   document.getElementById('jd-preview').addEventListener('input', (e) => {
-    if (!jobData) jobData = { title: '', company: '', description: '', url: '' };
-    jobData.description = e.target.value.trim();
+    ensureJobData().description = e.target.value.trim();
     syncJdChars();
     maybeEnableTailorBtn();
+  });
+
+  document.getElementById('jd-title').addEventListener('input', (e) => {
+    ensureJobData().title = e.target.value.trim();
+  });
+
+  document.getElementById('jd-company').addEventListener('input', (e) => {
+    ensureJobData().company = e.target.value.trim();
   });
 
   // Load stored server URL + email
@@ -342,8 +405,8 @@ async function init() {
 
     jobData = result;
     try { siteKey = new URL(jobData.url).hostname; } catch { siteKey = null; }
-    document.getElementById('jd-title').textContent = jobData.title || 'Unknown position';
-    document.getElementById('jd-company').textContent = jobData.company || '';
+    document.getElementById('jd-title').value = jobData.title || '';
+    document.getElementById('jd-company').value = jobData.company || '';
     document.getElementById('jd-preview').value = jobData.description;
     syncJdChars();
 
@@ -352,8 +415,8 @@ async function init() {
     }
 
   } catch (err) {
-    document.getElementById('jd-title').textContent = 'Could not read page';
-    setTailorStatus(`Extraction failed: ${err.message}`, 'error');
+    document.getElementById('jd-title').placeholder = 'Enter job title manually';
+    setTailorStatus(`Couldn't read the page — enter the details manually. (${err.message})`, 'error');
   }
 
   maybeEnableTailorBtn();
@@ -410,133 +473,26 @@ function applyResult(result) {
   downloadHandler = null;
 
   if (tailored) {
-    const fileName = `${(tailored.name || 'resume').replace(/\s+/g, '_')}_tailored.pdf`;
-    downloadHandler = () => {
-      const blob = buildResumePdf(tailored).output('blob');
-      const url = URL.createObjectURL(blob);
-      chrome.downloads.download({ url, filename: fileName });
+    // Open the tailored profile in a dedicated print page and let the browser's
+    // native print → Save as PDF do the rendering (crisp text, clickable links).
+    // Pass the job context too so the print page can name the file after it.
+    downloadHandler = async () => {
+      await chrome.storage.local.set({
+        [STORAGE_KEY_PRINT]: {
+          profile: tailored,
+          company: jobData?.company || '',
+          jobTitle: jobData?.title || '',
+        },
+      });
+      chrome.tabs.create({ url: chrome.runtime.getURL('print.html') });
     };
-    setTailorStatus('Resume tailored — ready to download.', 'success');
+    setTailorStatus('Résumé tailored — open it to save as PDF.', 'success');
     dlBtn.classList.add('visible');
     dlBtn.addEventListener('click', downloadHandler);
   } else {
     console.warn('[resume-tailor] no tailored profile in result:', result);
     setTailorStatus('Done, but no tailored resume returned.', 'error');
   }
-}
-
-// ── Client-side PDF (jsPDF) ───────────────────────────────────────────────────
-//
-// A plain single-column resume. Good enough "for now"; move to server-side
-// rendering (Gotenberg) later for real typographic polish.
-
-function buildResumePdf(p) {
-  const { jsPDF } = window.jspdf;
-  const doc = new jsPDF({ unit: 'pt', format: 'letter' });
-
-  const M = 48;
-  const pageW = doc.internal.pageSize.getWidth();
-  const pageH = doc.internal.pageSize.getHeight();
-  const contentW = pageW - M * 2;
-  let y = M;
-
-  // Add a page before drawing something `h` tall would overflow the bottom margin.
-  const ensure = (h) => {
-    if (y + h > pageH - M) {
-      doc.addPage();
-      y = M;
-    }
-  };
-
-  const line = (str, { size = 10, style = 'normal', color = '#1a1a1a', gap = 2, indent = 0 } = {}) => {
-    if (!str) return;
-    doc.setFont('helvetica', style);
-    doc.setFontSize(size);
-    doc.setTextColor(color);
-    for (const wrapped of doc.splitTextToSize(String(str), contentW - indent)) {
-      ensure(size + gap);
-      doc.text(wrapped, M + indent, y);
-      y += size + gap;
-    }
-  };
-
-  const section = (label) => {
-    y += 8;
-    line(label.toUpperCase(), { size: 10, style: 'bold', color: '#1e40af', gap: 4 });
-    ensure(10);
-    doc.setDrawColor('#cccccc');
-    doc.line(M, y - 2, pageW - M, y - 2);
-    y += 4;
-  };
-
-  // Header: name + contact line
-  line(p.name || 'Your Name', { size: 20, style: 'bold', gap: 5 });
-  const contact = [p.email, p.phone, p.location, p.linkedin, p.github, ...(p.links || [])]
-    .filter(Boolean).join('   |   ');
-  line(contact, { size: 9, color: '#555555', gap: 3 });
-
-  if (p.summary) {
-    section('Summary');
-    line(p.summary, { size: 10, gap: 3 });
-  }
-
-  if (p.experience?.length) {
-    section('Experience');
-    for (const e of p.experience) {
-      const heading = [e.title, e.company].filter(Boolean).join(' — ');
-      const dates = [e.startDate, e.endDate].filter(Boolean).join(' – ');
-      ensure(15);
-      doc.setFont('helvetica', 'bold');
-      doc.setFontSize(11);
-      doc.setTextColor('#1a1a1a');
-      doc.text(heading, M, y);
-      if (dates) {
-        doc.setFont('helvetica', 'normal');
-        doc.setFontSize(9);
-        doc.setTextColor('#666666');
-        doc.text(dates, pageW - M, y, { align: 'right' });
-      }
-      y += 14;
-      for (const b of (e.bullets || [])) line(`•  ${b}`, { indent: 12, gap: 3 });
-      y += 4;
-    }
-  }
-
-  if (p.projects?.length) {
-    section('Projects');
-    for (const pr of p.projects) {
-      line(pr.name, { size: 11, style: 'bold', gap: 3 });
-      if (pr.description) line(pr.description, { gap: 3 });
-      for (const b of (pr.bullets || [])) line(`•  ${b}`, { indent: 12, gap: 3 });
-      y += 4;
-    }
-  }
-
-  if (p.education?.length) {
-    section('Education');
-    for (const ed of p.education) {
-      line([ed.degree, ed.school].filter(Boolean).join(', '), { style: 'bold', gap: 2 });
-      const extra = [ed.year, ed.gpa && `GPA ${ed.gpa}`].filter(Boolean).join('  ·  ');
-      if (extra) line(extra, { size: 9, color: '#666666', gap: 3 });
-    }
-  }
-
-  if (p.skills?.length) {
-    section('Skills');
-    line(p.skills.join(', '), { gap: 3 });
-  }
-
-  if (p.certifications?.length) {
-    section('Certifications');
-    for (const c of p.certifications) line(`•  ${c}`, { indent: 12, gap: 3 });
-  }
-
-  if (p.achievements?.length) {
-    section('Achievements');
-    for (const a of p.achievements) line(`•  ${a}`, { indent: 12, gap: 3 });
-  }
-
-  return doc;
 }
 
 // ── Tailor button ─────────────────────────────────────────────────────────────

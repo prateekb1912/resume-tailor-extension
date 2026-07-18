@@ -199,6 +199,20 @@
     }
 
     /* ── JD section ── */
+    /* Editable so the user can fix a missed/wrong extraction. Looks like plain
+       text until hovered/focused, when a subtle underline appears. */
+    .jd-title,
+    .jd-company {
+      display: block;
+      width: 100%;
+      border: none;
+      border-bottom: 1px solid transparent;
+      background: transparent;
+      padding: 2px 0;
+      outline: none;
+      font-family: inherit;
+    }
+
     .jd-title {
       font-size: 14px;
       font-weight: 600;
@@ -210,6 +224,16 @@
       font-size: 12px;
       color: #6b7280;
       margin-top: 2px;
+    }
+
+    .jd-title:hover,
+    .jd-company:hover {
+      border-bottom-color: #e5e7eb;
+    }
+
+    .jd-title:focus,
+    .jd-company:focus {
+      border-bottom-color: #6366f1;
     }
 
     .jd-preview {
@@ -450,8 +474,8 @@
     <!-- Job description -->
     <div>
       <div class="section-label">Job Detected</div>
-      <div class="jd-title" id="jd-title">Detecting…</div>
-      <div class="jd-company" id="jd-company"></div>
+      <input class="jd-title" id="jd-title" placeholder="Job title" spellcheck="false">
+      <input class="jd-company" id="jd-company" placeholder="Company" spellcheck="false">
       <textarea class="jd-preview" id="jd-preview" spellcheck="false"
         placeholder="Job description — edit or paste here if extraction missed it."></textarea>
       <div class="jd-chars" id="jd-chars"></div>
@@ -479,11 +503,10 @@
     <!-- Action -->
     <button class="tailor-btn" id="tailor-btn" disabled>Tailor Resume</button>
     <div class="tailor-status" id="tailor-status"></div>
-    <button class="download-btn" id="download-btn">⬇ Download Tailored Resume</button>
+    <button class="download-btn" id="download-btn">📄 Open Résumé → Save as PDF</button>
 
   </div>
 
-  <script src="vendor/jspdf.umd.min.js"></script>
   <script src="popup.js"></script>
 </body>
 

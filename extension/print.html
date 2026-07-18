@@ -1,0 +1,168 @@
+<!DOCTYPE html>
+<html>
+
+<head>
+  <meta charset="UTF-8">
+  <title>Résumé</title>
+  <style>
+    * {
+      margin: 0;
+      padding: 0;
+      box-sizing: border-box;
+    }
+
+    /* Letter page with narrow margins, in the spirit of Jake's template. */
+    @page {
+      size: Letter;
+      margin: 0.45in 0.55in;
+    }
+
+    html,
+    body {
+      background: #e5e7eb;
+    }
+
+    body {
+      font-family: Georgia, "Times New Roman", Times, serif;
+      font-size: 10.5pt;
+      line-height: 1.3;
+      color: #000;
+    }
+
+    /* On-screen preview: a paper-like sheet. In print, fill the @page box. */
+    .sheet {
+      background: #fff;
+      max-width: 8.5in;
+      margin: 16px auto;
+      padding: 0.5in 0.55in;
+      box-shadow: 0 1px 8px rgba(0, 0, 0, 0.15);
+    }
+
+    @media print {
+      html, body { background: #fff; }
+      .sheet { margin: 0; padding: 0; box-shadow: none; max-width: none; }
+      .no-print { display: none !important; }
+    }
+
+    /* ── Header ── */
+    .name {
+      text-align: center;
+      font-size: 22pt;
+      font-weight: 700;
+      letter-spacing: 0.5px;
+    }
+
+    .contact {
+      text-align: center;
+      font-size: 9.5pt;
+      margin-top: 5px;
+    }
+
+    .contact a {
+      color: #000;
+      text-decoration: underline;
+    }
+
+    .contact .sep {
+      margin: 0 6px;
+      color: #333;
+    }
+
+    /* ── Sections ── */
+    .section {
+      margin-top: 13px;
+    }
+
+    .section > h2 {
+      font-size: 12pt;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.6px;
+      border-bottom: 1px solid #000;
+      padding-bottom: 2px;
+      margin-bottom: 5px;
+      break-after: avoid;
+    }
+
+    .section > p {
+      margin-top: 2px;
+    }
+
+    /* ── Entries (experience / education / projects) ── */
+    .entry {
+      margin-top: 7px;
+      break-inside: avoid;
+    }
+
+    .entry-row {
+      display: flex;
+      justify-content: space-between;
+      align-items: baseline;
+      gap: 12px;
+    }
+
+    .entry-row .left {
+      font-weight: 700;
+    }
+
+    .entry-row .right {
+      font-size: 9.5pt;
+      white-space: nowrap;
+      color: #222;
+    }
+
+    .entry-sub {
+      font-style: italic;
+      font-size: 10pt;
+      margin-top: 1px;
+    }
+
+    .proj-desc {
+      font-style: italic;
+      font-weight: 400;
+    }
+
+    ul.bullets {
+      margin: 3px 0 0 0;
+      padding-left: 17px;
+    }
+
+    ul.bullets li {
+      margin-bottom: 2px;
+    }
+
+    .skills {
+      margin-top: 2px;
+    }
+
+    /* Floating "Save as PDF" button for when auto-print is dismissed. */
+    .toolbar {
+      position: fixed;
+      top: 12px;
+      right: 12px;
+      z-index: 10;
+    }
+
+    .toolbar button {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+      font-size: 13px;
+      padding: 8px 14px;
+      background: #1e40af;
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      cursor: pointer;
+      box-shadow: 0 1px 4px rgba(0, 0, 0, 0.2);
+    }
+  </style>
+</head>
+
+<body>
+  <div class="toolbar no-print">
+    <button id="print-btn">Save as PDF</button>
+  </div>
+  <div class="sheet" id="resume"></div>
+  <script src="print.js"></script>
+</body>
+
+</html>
