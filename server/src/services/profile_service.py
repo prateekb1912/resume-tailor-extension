@@ -13,11 +13,37 @@ from src.services import llm
 logger = logging.getLogger(__name__)
 
 
-def _extract_pdf_text(file_bytes: bytes) -> str:
+def _extract_pdf_links(reader: PdfReader) -> list[str]:
+    links: list[str] = []
+    for page in reader.pages:
+        for ref in page.get("/Annots") or []:
+            annot = ref.get_object()
+            action = annot.get("/A")
+            if action and action.get("/S") == "/URI":
+                uri = action.get("/URI")
+                if uri and uri not in links:
+                    links.append(uri)
+    return links
+
+
+def _categorize_links(links: list[str]) -> dict[str, str]:
+    buckets = {"linkedin": "linkedin.com", "github": "github.com", "leetcode": "leetcode.com"}
+    out: dict[str, str] = {}
+    for url in links:
+        for name, domain in buckets.items():
+            if domain in url:
+                out[name] = url
+    return out
+
+
+def _read_pdf(file_bytes: bytes) -> PdfReader:
     try:
-        reader = PdfReader(io.BytesIO(file_bytes))
+        return PdfReader(io.BytesIO(file_bytes))
     except Exception:
         raise HTTPException(status_code=status.HTTP_400_BAD_REQUEST, detail="Could not read PDF")
+
+
+def _extract_pdf_text(reader: PdfReader) -> str:
     text = "\n".join(page.extract_text() or "" for page in reader.pages).strip()
     if not text:
         raise HTTPException(
@@ -28,9 +54,17 @@ def _extract_pdf_text(file_bytes: bytes) -> str:
 
 
 def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> ProfileData:
-    text = _extract_pdf_text(file_bytes)
+    reader = _read_pdf(file_bytes)
+    text = _extract_pdf_text(reader)
+    links = _extract_pdf_links(reader)
+
     raw = llm.extract_resume(text)
     profile_data = ProfileData.model_validate(raw)
+
+    categorized = _categorize_links(links)
+    profile_data.linkedin = categorized.get("linkedin", profile_data.linkedin)
+    profile_data.github = categorized.get("github", profile_data.github)
+    profile_data.links = [url for url in links if url.startswith(("http://", "https://"))]
 
     profile = get_profile(email, db)
 
