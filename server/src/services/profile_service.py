@@ -64,7 +64,11 @@ def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> Pr
     categorized = _categorize_links(links)
     profile_data.linkedin = categorized.get("linkedin", profile_data.linkedin)
     profile_data.github = categorized.get("github", profile_data.github)
-    profile_data.links = [url for url in links if url.startswith(("http://", "https://"))]
+
+    promoted = {categorized.get("linkedin"), categorized.get("github")}
+    profile_data.links = [
+        url for url in links if url.startswith(("http://", "https://")) and url not in promoted
+    ]
 
     profile = get_profile(email, db)
 

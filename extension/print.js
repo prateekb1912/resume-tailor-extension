@@ -21,6 +21,11 @@ function urlify(v) {
 // Strip the scheme so link text reads "linkedin.com/in/x" rather than the full URL.
 const display = (v) => String(v).replace(/^https?:\/\//i, '').replace(/\/$/, '');
 
+// Phone numbers pulled from a PDF often carry a leading icon-glyph artifact
+// (e.g. "/ne8766300037") because the résumé's phone icon has no Unicode
+// mapping. Drop anything before the first digit, + or ( so the number reads clean.
+const cleanPhone = (v) => String(v).replace(/^[^\d+(]+/, '').trim();
+
 function link(text, url) {
   return url ? `<a href="${esc(url)}">${esc(text)}</a>` : esc(text);
 }
@@ -37,11 +42,22 @@ function buildResumeHtml(p) {
 
   const contact = [];
   if (p.email) contact.push(link(p.email, `mailto:${p.email}`));
-  if (p.phone) contact.push(esc(p.phone));
+  if (p.phone) contact.push(esc(cleanPhone(p.phone)));
   if (p.location) contact.push(esc(p.location));
-  if (p.linkedin) contact.push(link(display(p.linkedin), urlify(p.linkedin)));
-  if (p.github) contact.push(link(display(p.github), urlify(p.github)));
-  for (const l of (p.links || [])) contact.push(link(display(l), urlify(l)));
+
+  const seen = new Set();
+  const addLink = (v) => {
+    if (!v) return;
+    const url = urlify(v);
+    const key = (url || '').toLowerCase().replace(/\/+$/, '');
+    if (key && seen.has(key)) return;
+    if (key) seen.add(key);
+    contact.push(link(display(v), url));
+  };
+  addLink(p.linkedin);
+  addLink(p.github);
+  for (const l of (p.links || [])) addLink(l);
+
   if (contact.length) {
     out.push(`<div class="contact">${contact.join('<span class="sep">|</span>')}</div>`);
   }

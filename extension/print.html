@@ -11,10 +11,12 @@
       box-sizing: border-box;
     }
 
-    /* Letter page with narrow margins, in the spirit of Jake's template. */
+    /* Letter page. Margin is 0 so Chrome has no room to draw its own
+       header/footer (date, title, URL, page number); the real page margin
+       comes from .sheet padding in the print block below. */
     @page {
       size: Letter;
-      margin: 0.45in 0.55in;
+      margin: 0;
     }
 
     html,
@@ -40,7 +42,7 @@
 
     @media print {
       html, body { background: #fff; }
-      .sheet { margin: 0; padding: 0; box-shadow: none; max-width: none; }
+      .sheet { margin: 0; padding: 0.5in 0.55in; box-shadow: none; max-width: none; }
       .no-print { display: none !important; }
     }
 
