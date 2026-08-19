@@ -1,0 +1,53 @@
+# Render blueprint — web API + Postgres + a cron for the job fetch.
+# Deploy: push to GitHub, then Render Dashboard → New → Blueprint → pick this repo.
+# Set the sync:false secrets (API keys) in the dashboard after the first deploy.
+databases:
+  - name: tailr-db
+    plan: free
+    databaseName: tailr
+    user: tailr
+
+services:
+  - type: web
+    name: tailr-api
+    runtime: python
+    rootDir: server
+    plan: free
+    buildCommand: pipenv install --deploy
+    startCommand: pipenv run alembic upgrade head && pipenv run uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tailr-db
+          property: connectionString
+      - key: JWT_SECRET
+        generateValue: true
+      - key: ENVIRONMENT
+        value: production
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APIFY_TOKEN
+        sync: false
+
+  # LinkedIn/Apify runs ONLY here, on schedule — never on a button. Every 6 hours.
+  - type: cron
+    name: tailr-fetch
+    runtime: python
+    rootDir: server
+    plan: free
+    schedule: "0 */6 * * *"
+    buildCommand: pipenv install --deploy
+    startCommand: pipenv run python -m src.jobs.fetch_jobs
+    envVars:
+      - key: DATABASE_URL
+        fromDatabase:
+          name: tailr-db
+          property: connectionString
+      - key: OPENAI_API_KEY
+        sync: false
+      - key: ANTHROPIC_API_KEY
+        sync: false
+      - key: APIFY_TOKEN
+        sync: false
