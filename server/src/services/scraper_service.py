@@ -26,13 +26,11 @@ _SEED_COMPANIES: list[tuple[str, str, str]] = [
     (JobSource.LEVER, "spotify", "Spotify"),
 ]
 
-_DEFAULT_LINKEDIN_TITLES = [
-    "Backend Engineer", "Software Engineer", "Software Developer", "Node.js Developer",
-    "Python Developer", "Backend Developer", "AI Engineer", "Agentic AI Developer",
-    "AI Developer", "Forward Deployed Engineer",
-]
-
-_BOARD_SCRAPERS = {JobSource.GREENHOUSE: greenhouse, JobSource.LEVER: lever, JobSource.WORKABLE: workable}
+_BOARD_SCRAPERS = {
+    JobSource.GREENHOUSE: greenhouse,
+    JobSource.LEVER: lever,
+    JobSource.WORKABLE: workable,
+}
 
 
 def _parse_dt(value: str | None) -> datetime | None:
@@ -113,21 +111,27 @@ def _board_items(db: Session, source: str) -> list[dict[str, Any]]:
 
 
 def _linkedin_titles(db: Session) -> list[str]:
+    """Search titles come straight from what users configured in their preferences —
+    never a hardcoded list. No users, no titles -> LinkedIn is skipped."""
     titles: list[str] = []
     for (prefs,) in db.query(Profile.preferences).all():
         for t in (prefs or {}).get("titles", []):
             if t and t not in titles:
                 titles.append(t)
-    return (titles or _DEFAULT_LINKEDIN_TITLES)[: settings.apify_max_titles]
+    return titles[: settings.apify_max_titles]
 
 
 def _linkedin_items(db: Session) -> list[dict[str, Any]]:
     if not settings.apify_token:
         logger.warning("APIFY_TOKEN not set — skipping LinkedIn")
         return []
+    titles = _linkedin_titles(db)
+    if not titles:
+        logger.info("no user preference titles configured — skipping LinkedIn")
+        return []
     try:
         return linkedin_apify.fetch_jobs(
-            _linkedin_titles(db),
+            titles,
             settings.apify_location,
             settings.apify_token,
             settings.apify_actor_id,
