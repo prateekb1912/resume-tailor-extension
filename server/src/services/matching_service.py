@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
 from src.config.enums import ApplicationStatus
-from src.models import Job, JobMatch
+from src.models import Job, JobMatch, Profile
 from src.schemas.profile import Preferences, ProfileData
 from src.services import llm, profile_service
 
@@ -80,3 +80,22 @@ def match_profile(email: str, db: Session, limit: int = _SCREEN_LIMIT) -> dict[s
         "screened": screened,
         "remaining": max(0, len(candidates) - len(already) - len(todo)),
     }
+
+
+def match_active_profiles(db: Session, limit: int = _SCREEN_LIMIT) -> dict[str, int]:
+    """Cron: screen new jobs for every onboarded profile (has a résumé + search titles),
+    so boards fill without anyone clicking Match. Already-scored jobs are skipped per profile."""
+    profiles = db.query(Profile).filter(Profile.email.isnot(None)).all()
+    matched = screened = 0
+    for profile in profiles:
+        prefs = Preferences.model_validate(profile.preferences or {})
+        if not prefs.titles or not (profile.data or {}).get("skills"):
+            continue  # not onboarded enough to screen meaningfully
+        try:
+            result = match_profile(profile.email, db, limit=limit)
+        except Exception as exc:  # noqa: BLE001 — one bad profile shouldn't stop the rest
+            logger.warning("auto-match failed for %s: %s", profile.email, exc)
+            continue
+        screened += result["screened"]
+        matched += 1
+    return {"profiles_matched": matched, "jobs_screened": screened}
