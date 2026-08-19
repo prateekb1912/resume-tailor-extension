@@ -5,75 +5,130 @@
 <meta name="viewport" content="width=device-width, initial-scale=1">
 <title>Tailr — Jobs</title>
 <style>
-  :root { --bg:#0f1420; --panel:#171f2e; --card:#1e293b; --line:#2b3a52; --text:#e6edf6; --muted:#93a3ba; --accent:#5b8cff; }
+  :root {
+    --bg:#f6f7f9; --panel:#eef0f3; --card:#ffffff; --line:#e3e6ea; --line2:#eceef1;
+    --text:#1f2733; --muted:#8a94a3; --link:#2563eb; --accent:#4f46e5; --shadow:0 1px 2px rgba(16,24,40,.06),0 1px 3px rgba(16,24,40,.05);
+  }
   * { box-sizing:border-box; }
-  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
-  header { padding:14px 18px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
-  header h1 { font-size:16px; margin:0 10px 0 0; }
-  input, button, select { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 10px; }
-  button { cursor:pointer; }
+  body { margin:0; font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:12px 18px; background:#fff; border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
+  header h1 { font-size:15px; margin:0 8px 0 0; font-weight:700; }
+  input, button, select, textarea { font:inherit; color:var(--text); background:#fff; border:1px solid var(--line); border-radius:8px; padding:7px 10px; }
+  input::placeholder { color:var(--muted); }
+  button { cursor:pointer; background:#fff; }
+  button:hover { background:#f3f4f6; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
-  #board { display:flex; gap:12px; padding:16px; overflow-x:auto; align-items:flex-start; }
-  .col { background:var(--panel); border:1px solid var(--line); border-radius:12px; width:280px; flex:0 0 280px; }
-  .col h2 { font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:0; padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; }
-  .col-body { padding:10px; display:flex; flex-direction:column; gap:8px; min-height:60px; }
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 11px; }
-  .card a { color:var(--text); font-weight:600; text-decoration:none; font-size:13.5px; }
-  .card a:hover { color:var(--accent); }
-  .meta { color:var(--muted); font-size:12px; margin:4px 0 8px; }
-  .badge { font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:1px 6px; }
-  .card select { width:100%; padding:5px 8px; font-size:12px; }
+  button.primary:hover { filter:brightness(1.05); }
+
+  #board { display:flex; gap:14px; padding:16px; overflow-x:auto; align-items:flex-start; }
+  .col { width:300px; flex:0 0 300px; }
+  .col-head { display:flex; align-items:center; justify-content:space-between; padding:2px 4px 10px; }
+  .pill { font-size:12px; font-weight:600; padding:3px 12px; border-radius:999px; text-transform:capitalize; }
+  .count { color:var(--muted); font-size:12px; font-weight:600; }
+  .pill.new{background:#e7ecfe;color:#3b5bdb} .pill.saved{background:#efe7fd;color:#7048e8}
+  .pill.applied{background:#e2f6fb;color:#0c8599} .pill.interviewing{background:#fdf1dc;color:#b0812a}
+  .pill.offer{background:#e4f7ec;color:#2f9e44} .pill.rejected{background:#fde8ec;color:#d6336c}
+  .pill.skipped{background:#fbe8d3;color:#c26a1f}
+  .col-head { cursor:pointer; user-select:none; }
+  .col-body { display:flex; flex-direction:column; gap:10px; min-height:80px; padding:4px; border-radius:12px; }
+  .col-body.drop { background:#eef1fe; outline:2px dashed #c3cbf5; }
+  .col.collapsed { width:46px; flex:0 0 46px; }
+  .col.collapsed .col-body { display:none; }
+  .col.collapsed .col-head { writing-mode:vertical-rl; height:auto; padding:12px 0; gap:10px; justify-content:flex-start; }
+
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 15px; box-shadow:var(--shadow); cursor:grab; }
+  .card:active { cursor:grabbing; }
+  .card h3 { margin:0 0 10px; font-size:17px; font-weight:600; line-height:1.25; }
+  .field { margin-bottom:9px; }
+  .field .lbl { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; margin-bottom:2px; }
+  .field .val { font-size:13.5px; word-break:break-word; }
+  .field a { color:var(--link); text-decoration:none; }
+  .field a:hover { text-decoration:underline; }
+  .score { display:inline-block; font-weight:700; font-size:13px; padding:1px 8px; border-radius:6px; }
+  .ic { width:13px; height:13px; opacity:.7; }
+
   #empty { color:var(--muted); padding:24px; }
-  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:10; }
+  .overlay { position:fixed; inset:0; background:rgba(15,23,42,.4); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:10; }
   .overlay.show { display:flex; }
-  .modal { background:var(--panel); border:1px solid var(--line); border-radius:12px; width:540px; max-width:100%; padding:18px 20px; }
-  .modal h2 { margin:0 0 4px; font-size:15px; }
+  .modal { background:#fff; border:1px solid var(--line); border-radius:14px; width:540px; max-width:100%; padding:20px 22px; box-shadow:0 10px 40px rgba(16,24,40,.18); }
+  .modal h2 { margin:0 0 2px; font-size:16px; }
   .modal .sub { color:var(--muted); font-size:12px; margin-bottom:14px; }
-  .field { margin-bottom:12px; }
-  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
-  .field input[type=text], .field input[type=number], .field textarea { width:100%; }
-  .field textarea { min-height:72px; resize:vertical; }
-  .row2 { display:flex; gap:10px; }
-  .row2 > div { flex:1; }
-  .checks { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; color:var(--text); }
+  .fld { margin-bottom:12px; }
+  .fld label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .fld input[type=text], .fld input[type=number], .fld textarea { width:100%; }
+  .fld textarea { min-height:72px; resize:vertical; }
+  .row2 { display:flex; gap:10px; } .row2 > div { flex:1; }
+  .checks { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; }
   .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
 </style>
 </head>
 <body>
 <header>
-  <h1>Tailr — Jobs</h1>
-  <input id="email" placeholder="filter by your email (prefs)" size="26">
-  <input id="q" placeholder="search title / company" size="20">
+  <h1>Tailr</h1>
+  <input id="q" placeholder="search" size="14">
   <button onclick="load()">Apply</button>
-  <button class="primary" onclick="refresh()">↻ Fetch new jobs</button>
   <button class="primary" onclick="matchForMe()">🎯 Match for me</button>
+  <button onclick="refresh()">↻ Fetch</button>
+  <button onclick="openResume()">📄 Resume</button>
   <button onclick="openPrefs()">⚙ Preferences</button>
-  <label style="color:var(--muted);font-size:12px;"><input type="checkbox" id="showall" onchange="load()"> show low-fit</label>
   <span id="status" style="color:var(--muted);font-size:12px;"></span>
+  <span style="margin-left:auto;display:flex;gap:8px;align-items:center;">
+    <span id="whoami" style="color:var(--muted);font-size:12px;"></span>
+    <button onclick="logout()">Log out</button>
+  </span>
 </header>
 <div id="board"></div>
-<div id="empty" style="display:none">No jobs yet — click “Fetch new jobs”.</div>
+<div id="empty" style="display:none">No jobs yet — click “Fetch”.</div>
+
+<div class="overlay" id="auth-overlay">
+  <div class="modal">
+    <h2 id="auth-title">Sign in to Tailr</h2>
+    <div class="sub" id="auth-sub">Your jobs, profile and preferences live behind your account.</div>
+    <div class="fld"><label>Email</label><input type="text" id="auth-email" placeholder="you@example.com"></div>
+    <div class="fld"><label>Password</label><input type="password" id="auth-password" placeholder="at least 8 characters"></div>
+    <div class="modal-actions">
+      <span id="auth-status" style="color:var(--muted);font-size:12px;margin-right:auto;"></span>
+      <button id="auth-toggle" onclick="toggleAuthMode()">Need an account? Sign up</button>
+      <button class="primary" id="auth-submit" onclick="submitAuth()">Sign in</button>
+    </div>
+  </div>
+</div>
+
+<div class="overlay" id="resume-overlay">
+  <div class="modal">
+    <h2>Resume</h2>
+    <div class="sub" id="resume-for"></div>
+    <div id="resume-summary" style="margin-bottom:12px;font-size:13px;"></div>
+    <div class="fld"><label>Upload PDF résumé — parses &amp; saves your profile</label>
+      <input type="file" id="resume-file" accept="application/pdf"></div>
+    <div class="modal-actions">
+      <span id="resume-status" style="color:var(--muted);font-size:12px;margin-right:auto;"></span>
+      <button onclick="closeResume()">Close</button>
+      <button class="primary" onclick="parseResume()">Parse &amp; Save</button>
+    </div>
+  </div>
+</div>
 
 <div class="overlay" id="prefs-overlay">
   <div class="modal">
     <h2>Preferences</h2>
     <div class="sub" id="prefs-for"></div>
-    <div class="field"><label>Target titles (comma-separated)</label><input type="text" id="pf-titles" placeholder="Backend Engineer, AI Engineer"></div>
-    <div class="field"><label>Locations (comma-separated)</label><input type="text" id="pf-locations" placeholder="Bengaluru, India, Remote"></div>
-    <div class="field"><label>Seniority (comma-separated)</label><input type="text" id="pf-seniority" placeholder="mid, senior"></div>
-    <div class="field"><label>Work types</label><div class="checks">
+    <div class="fld"><label>Target titles (comma-separated)</label><input type="text" id="pf-titles" placeholder="Backend Engineer, AI Engineer"></div>
+    <div class="fld"><label>Locations (comma-separated)</label><input type="text" id="pf-locations" placeholder="Bengaluru, India, Remote"></div>
+    <div class="fld"><label>Seniority (comma-separated)</label><input type="text" id="pf-seniority" placeholder="mid, senior"></div>
+    <div class="fld"><label>Work types</label><div class="checks">
       <label><input type="checkbox" id="wt-remote" value="remote"> remote</label>
       <label><input type="checkbox" id="wt-onsite" value="onsite"> onsite</label>
       <label><input type="checkbox" id="wt-hybrid" value="hybrid"> hybrid</label>
       <label><input type="checkbox" id="pf-relocation"> open to relocation</label>
     </div></div>
-    <div class="field"><label>Exclude companies (comma-separated)</label><input type="text" id="pf-exclude-companies" placeholder="Turing"></div>
-    <div class="field"><label>Reject if role requires (comma-separated)</label><input type="text" id="pf-exclude-keywords" placeholder="frontend"></div>
+    <div class="fld"><label>Exclude companies (comma-separated)</label><input type="text" id="pf-exclude-companies" placeholder="Turing"></div>
+    <div class="fld"><label>Reject if role requires (comma-separated)</label><input type="text" id="pf-exclude-keywords" placeholder="frontend"></div>
     <div class="row2">
-      <div class="field"><label>Max age (days)</label><input type="number" id="pf-max-age" value="7"></div>
-      <div class="field"><label>Min fit score (0-100)</label><input type="number" id="pf-min-score" value="60"></div>
+      <div class="fld"><label>Max age (days)</label><input type="number" id="pf-max-age" value="7"></div>
+      <div class="fld"><label>Min fit score (0-100)</label><input type="number" id="pf-min-score" value="60"></div>
     </div>
-    <div class="field"><label>Screening instructions (free text — your judgment criteria)</label><textarea id="pf-instructions" placeholder="Reject required frontend. Core ML too hardcore; agent/LangGraph work is my strength."></textarea></div>
+    <div class="fld"><label>Screening instructions (free text)</label><textarea id="pf-instructions" placeholder="Reject required frontend. Core ML too hardcore; agent/LangGraph work is my strength."></textarea></div>
     <div class="modal-actions">
       <span id="prefs-status" style="color:var(--muted);font-size:12px;margin-right:auto;"></span>
       <button onclick="closePrefs()">Cancel</button>
@@ -83,88 +138,106 @@
 </div>
 
 <script>
-const COLUMNS = ["new","saved","applied","interviewing","offer","rejected"];
+const COLUMNS = ["skipped","new","saved","applied","interviewing","offer","rejected"];
+const collapsed = new Set(JSON.parse(localStorage.getItem("collapsed") || "[]"));
+let lastJobs = [];
 const setStatus = m => document.getElementById("status").textContent = m;
 const csv = s => s.split(",").map(x => x.trim()).filter(Boolean);
 const joinCsv = a => (a || []).join(", ");
 const $ = id => document.getElementById(id);
+const esc = s => (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
+const scoreColor = s => s >= 75 ? "#e4f7ec;color:#2f9e44" : s >= 60 ? "#fdf1dc;color:#b0812a" : "#fde8ec;color:#d6336c";
+let dragId = null;
 
-// Preferences are per-email (per profile), so each person edits only their own.
-async function openPrefs() {
-  const email = $("email").value.trim();
-  if (!email) { setStatus("enter your email first"); return; }
-  const res = await fetch("/profile/?email=" + encodeURIComponent(email));
-  if (res.status === 404) { setStatus("no profile for that email — parse a resume first"); return; }
-  const p = (await res.json()).preferences || {};
-  $("prefs-for").textContent = "for " + email;
-  $("pf-titles").value = joinCsv(p.titles);
-  $("pf-locations").value = joinCsv(p.locations);
-  $("pf-seniority").value = joinCsv(p.seniority);
-  const wt = new Set(p.work_types || []);
-  $("wt-remote").checked = wt.has("remote");
-  $("wt-onsite").checked = wt.has("onsite");
-  $("wt-hybrid").checked = wt.has("hybrid");
-  $("pf-relocation").checked = !!p.open_to_relocation;
-  $("pf-exclude-companies").value = joinCsv(p.exclude_companies);
-  $("pf-exclude-keywords").value = joinCsv(p.exclude_keywords);
-  $("pf-max-age").value = p.max_age_days ?? 7;
-  $("pf-min-score").value = p.min_match_score ?? 60;
-  $("pf-instructions").value = p.screening_instructions || "";
-  $("prefs-status").textContent = "";
-  $("prefs-overlay").classList.add("show");
+// ---- auth ---------------------------------------------------------------
+const TOKEN_KEY = "tailr_token";
+let token = localStorage.getItem(TOKEN_KEY) || "";
+let authMode = "login";
+
+// Wrapper around fetch that attaches the bearer token and bounces to the
+// login gate on a 401. Never send FormData through JSON headers.
+async function api(path, opts = {}) {
+  const headers = { ...(opts.headers || {}) };
+  if (token) headers["Authorization"] = "Bearer " + token;
+  const res = await fetch(path, { ...opts, headers });
+  if (res.status === 401) { logout(); throw new Error("unauthorized"); }
+  return res;
 }
-function closePrefs() { $("prefs-overlay").classList.remove("show"); }
-async function savePrefs() {
-  const email = $("email").value.trim();
-  const work_types = ["wt-remote","wt-onsite","wt-hybrid"].filter(id => $(id).checked).map(id => $(id).value);
-  const preferences = {
-    titles: csv($("pf-titles").value),
-    locations: csv($("pf-locations").value),
-    seniority: csv($("pf-seniority").value),
-    work_types,
-    open_to_relocation: $("pf-relocation").checked,
-    exclude_companies: csv($("pf-exclude-companies").value),
-    exclude_keywords: csv($("pf-exclude-keywords").value),
-    max_age_days: parseInt($("pf-max-age").value || "7", 10),
-    min_match_score: parseInt($("pf-min-score").value || "60", 10),
-    screening_instructions: $("pf-instructions").value,
-  };
-  $("prefs-status").textContent = "saving…";
-  const res = await fetch("/profile/preferences", {
-    method: "PUT",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, preferences }),
+
+function toggleAuthMode() {
+  authMode = authMode === "login" ? "register" : "login";
+  const login = authMode === "login";
+  $("auth-title").textContent = login ? "Sign in to Tailr" : "Create your Tailr account";
+  $("auth-submit").textContent = login ? "Sign in" : "Sign up";
+  $("auth-toggle").textContent = login ? "Need an account? Sign up" : "Have an account? Sign in";
+  $("auth-status").textContent = "";
+}
+
+async function submitAuth() {
+  const email = $("auth-email").value.trim();
+  const password = $("auth-password").value;
+  if (!email || !password) { $("auth-status").textContent = "email and password required"; return; }
+  $("auth-status").textContent = "…";
+  const res = await fetch("/auth/" + (authMode === "login" ? "login" : "register"), {
+    method: "POST", headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, password }),
   });
-  if (!res.ok) { $("prefs-status").textContent = "save failed (" + res.status + ")"; return; }
-  closePrefs();
-  setStatus("preferences saved");
+  if (!res.ok) {
+    const msg = (await res.json().catch(() => ({}))).detail || ("failed (" + res.status + ")");
+    $("auth-status").textContent = typeof msg === "string" ? msg : "failed";
+    return;
+  }
+  token = (await res.json()).access_token;
+  localStorage.setItem(TOKEN_KEY, token);
+  $("auth-overlay").classList.remove("show");
+  $("auth-password").value = "";
+  boot();
+}
+
+function logout() {
+  token = "";
+  localStorage.removeItem(TOKEN_KEY);
+  $("whoami").textContent = "";
+  $("board").innerHTML = "";
+  $("auth-overlay").classList.add("show");
+}
+
+async function boot() {
+  if (!token) { $("auth-overlay").classList.add("show"); return; }
+  try {
+    const me = await api("/auth/me");
+    if (!me.ok) return logout();
+    $("whoami").textContent = (await me.json()).email || "";
+    load();
+  } catch { /* logout already fired on 401 */ }
 }
 
 async function load() {
-  const email = document.getElementById("email").value.trim();
-  const q = document.getElementById("q").value.trim();
+  const q = $("q").value.trim();
   const params = new URLSearchParams();
-  if (email) params.set("email", email);
   if (q) params.set("q", q);
-  if (document.getElementById("showall").checked) params.set("min_score", "0");
-  const res = await fetch("/jobs/?" + params.toString());
-  const jobs = await res.json();
+  const jobs = await (await api("/jobs/?" + params)).json();
+  lastJobs = jobs;
   render(jobs);
   setStatus(jobs.length + " jobs");
-  document.getElementById("empty").style.display = jobs.length ? "none" : "block";
+  $("empty").style.display = jobs.length ? "none" : "block";
 }
 
 function render(jobs) {
   const byStatus = Object.fromEntries(COLUMNS.map(c => [c, []]));
   for (const j of jobs) (byStatus[j.status] || byStatus["new"]).push(j);
-  const board = document.getElementById("board");
+  const board = $("board");
   board.innerHTML = "";
   for (const col of COLUMNS) {
     const items = byStatus[col];
     const el = document.createElement("div");
-    el.className = "col";
-    el.innerHTML = `<h2>${col}<span>${items.length}</span></h2><div class="col-body"></div>`;
+    el.className = "col" + (collapsed.has(col) ? " collapsed" : "");
+    el.innerHTML = `<div class="col-head" onclick="toggleCol('${col}')"><span class="pill ${col}">${col}</span><span class="count">${items.length}</span></div>
+      <div class="col-body" data-col="${col}"></div>`;
     const body = el.querySelector(".col-body");
+    body.addEventListener("dragover", e => { e.preventDefault(); body.classList.add("drop"); });
+    body.addEventListener("dragleave", () => body.classList.remove("drop"));
+    body.addEventListener("drop", e => { e.preventDefault(); body.classList.remove("drop"); if (dragId) move(dragId, col); });
     for (const j of items) body.appendChild(cardEl(j));
     board.appendChild(el);
   }
@@ -173,50 +246,102 @@ function render(jobs) {
 function cardEl(j) {
   const el = document.createElement("div");
   el.className = "card";
-  const loc = j.location ? " · " + j.location : "";
-  const opts = COLUMNS.map(c => `<option value="${c}" ${c===j.status?"selected":""}>${c}</option>`).join("");
-  const score = (j.match_score != null)
-    ? `<span class="badge" title="${(j.reason||"").replace(/"/g,"'")}">${j.match_score}% fit</span> ` : "";
+  el.draggable = true;
+  el.addEventListener("dragstart", () => { dragId = j.id; });
+  const shortUrl = j.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 34) + "…";
+  const posted = j.posted_at ? j.posted_at.replace("T", "  ").slice(0, 16) : "—";
+  const scoreField = (j.match_score != null) ? `
+    <div class="field"><div class="lbl"># match_score</div>
+      <div class="val"><span class="score" style="background:${scoreColor(j.match_score)}" title="${esc(j.reason)}">${j.match_score}</span></div></div>` : "";
   el.innerHTML = `
-    <a href="${j.url}" target="_blank" rel="noopener">${j.title}</a>
-    <div class="meta">${score}${j.company}${loc} · <span class="badge">${j.source}</span></div>
-    <select>${opts}</select>`;
-  el.querySelector("select").addEventListener("change", e => move(j.id, e.target.value));
+    <h3>${esc(j.company)}</h3>
+    <div class="field"><div class="lbl">T job_title</div><div class="val">${esc(j.title)}</div></div>
+    <div class="field"><div class="lbl">🔗 job_url</div><div class="val"><a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(shortUrl)}</a></div></div>
+    <div class="field"><div class="lbl">📅 processed_at</div><div class="val">${posted}</div></div>
+    ${scoreField}
+    <div class="field"><div class="lbl">· source</div><div class="val">${esc(j.location || "")} <span style="color:var(--muted)">(${j.source})</span></div></div>`;
   return el;
 }
 
+function toggleCol(col) {
+  collapsed.has(col) ? collapsed.delete(col) : collapsed.add(col);
+  localStorage.setItem("collapsed", JSON.stringify([...collapsed]));
+  render(lastJobs);
+}
 async function move(id, status) {
-  await fetch("/jobs/" + id, {
-    method: "PATCH",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ status }),
-  });
+  await api("/jobs/" + id, { method:"PATCH", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ status }) });
+  dragId = null;
   load();
 }
-
 async function refresh() {
   setStatus("fetching…");
-  const res = await fetch("/jobs/refresh", { method: "POST" });
-  const r = await res.json();
-  setStatus(`+${r.new_jobs} new jobs`);
-  load();
+  const r = await (await api("/jobs/refresh", { method:"POST" })).json();
+  setStatus(`+${r.new_jobs} new jobs`); load();
 }
-
 async function matchForMe() {
-  const email = document.getElementById("email").value.trim();
-  if (!email) { setStatus("enter your email first"); return; }
   setStatus("screening against your preferences…");
-  const res = await fetch("/jobs/match", {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email }),
-  });
-  const r = await res.json();
-  setStatus(`screened ${r.screened} (of ${r.candidates} matching prefs, ${r.remaining} left)`);
-  load();
+  const r = await (await api("/jobs/match", { method:"POST" })).json();
+  setStatus(`screened ${r.screened} (of ${r.candidates} matching prefs, ${r.remaining} left)`); load();
 }
 
-load();
+async function openResume() {
+  $("resume-for").textContent = "for " + ($("whoami").textContent || "you");
+  $("resume-status").textContent = ""; $("resume-file").value = "";
+  const res = await api("/profile/");
+  if (res.ok) {
+    const p = (await res.json()).data || {};
+    $("resume-summary").innerHTML = `Current profile: <b>${esc(p.name || "—")}</b> · ${(p.skills || []).length} skills · ${(p.experience || []).length} roles`;
+  } else {
+    $("resume-summary").textContent = "No profile yet — upload a résumé to create one.";
+  }
+  $("resume-overlay").classList.add("show");
+}
+function closeResume() { $("resume-overlay").classList.remove("show"); }
+async function parseResume() {
+  const file = $("resume-file").files[0];
+  if (!file) { $("resume-status").textContent = "choose a PDF first"; return; }
+  const fd = new FormData();
+  fd.append("resume", file);
+  $("resume-status").textContent = "parsing… (a few seconds)";
+  const res = await api("/resume/parse", { method: "POST", body: fd });
+  if (!res.ok) { $("resume-status").textContent = "parse failed (" + res.status + ")"; return; }
+  const p = (await res.json()).data || {};
+  $("resume-summary").innerHTML = `Saved: <b>${esc(p.name || "—")}</b> · ${(p.skills || []).length} skills`;
+  $("resume-status").textContent = "saved ✓";
+}
+
+async function openPrefs() {
+  const res = await api("/profile/");
+  if (!res.ok) { setStatus("no profile yet — upload a résumé first"); return; }
+  const p = (await res.json()).preferences || {};
+  $("prefs-for").textContent = "for " + ($("whoami").textContent || "you");
+  $("pf-titles").value = joinCsv(p.titles); $("pf-locations").value = joinCsv(p.locations);
+  $("pf-seniority").value = joinCsv(p.seniority);
+  const wt = new Set(p.work_types || []);
+  $("wt-remote").checked = wt.has("remote"); $("wt-onsite").checked = wt.has("onsite"); $("wt-hybrid").checked = wt.has("hybrid");
+  $("pf-relocation").checked = !!p.open_to_relocation;
+  $("pf-exclude-companies").value = joinCsv(p.exclude_companies); $("pf-exclude-keywords").value = joinCsv(p.exclude_keywords);
+  $("pf-max-age").value = p.max_age_days ?? 7; $("pf-min-score").value = p.min_match_score ?? 60;
+  $("pf-instructions").value = p.screening_instructions || "";
+  $("prefs-status").textContent = ""; $("prefs-overlay").classList.add("show");
+}
+function closePrefs() { $("prefs-overlay").classList.remove("show"); }
+async function savePrefs() {
+  const work_types = ["wt-remote","wt-onsite","wt-hybrid"].filter(id => $(id).checked).map(id => $(id).value);
+  const preferences = {
+    titles: csv($("pf-titles").value), locations: csv($("pf-locations").value), seniority: csv($("pf-seniority").value),
+    work_types, open_to_relocation: $("pf-relocation").checked,
+    exclude_companies: csv($("pf-exclude-companies").value), exclude_keywords: csv($("pf-exclude-keywords").value),
+    max_age_days: parseInt($("pf-max-age").value || "7", 10), min_match_score: parseInt($("pf-min-score").value || "60", 10),
+    screening_instructions: $("pf-instructions").value,
+  };
+  $("prefs-status").textContent = "saving…";
+  const res = await api("/profile/preferences", { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(preferences) });
+  if (!res.ok) { $("prefs-status").textContent = "save failed (" + res.status + ")"; return; }
+  closePrefs(); setStatus("preferences saved");
+}
+
+boot();
 </script>
 </body>
 </html>

@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict, EmailStr
+from pydantic import BaseModel, ConfigDict
 
 from src.config.enums import ApplicationStatus
 
@@ -24,7 +24,3 @@ class JobResponse(BaseModel):
 
 class JobStatusUpdate(BaseModel):
     status: ApplicationStatus
-
-
-class MatchRequest(BaseModel):
-    email: EmailStr

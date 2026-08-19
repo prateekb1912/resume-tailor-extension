@@ -6,7 +6,7 @@ from fastapi.middleware.cors import CORSMiddleware
 from fastapi.staticfiles import StaticFiles
 
 from src.config.settings import settings
-from src.routers import jobs, profile, resume
+from src.routers import auth, jobs, profile, resume
 
 logging.basicConfig(level=logging.INFO)
 
@@ -19,6 +19,7 @@ app.add_middleware(
     allow_headers=["*"],
 )
 
+app.include_router(auth.router, prefix="/auth", tags=["auth"])
 app.include_router(resume.router, prefix="/resume", tags=["resume"])
 app.include_router(profile.router, prefix="/profile", tags=["profile"])
 app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])

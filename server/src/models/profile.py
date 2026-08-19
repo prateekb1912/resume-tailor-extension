@@ -14,9 +14,15 @@ class Profile(Base, UUIDMixin, TimestampMixin):
     data: Mapped[dict[str, Any]] = mapped_column(JSONB)
     name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
+    password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
     preferences: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")
     )
 
     def to_dict(self):
-        return {c.key: getattr(self, c.key) for c in self.__mapper__.column_attrs}
+        # never expose password_hash
+        return {
+            c.key: getattr(self, c.key)
+            for c in self.__mapper__.column_attrs
+            if c.key != "password_hash"
+        }

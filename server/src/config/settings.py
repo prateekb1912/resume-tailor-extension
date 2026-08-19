@@ -20,6 +20,13 @@ class Settings(BaseSettings):
 
     max_upload_bytes: int = 5 * 1024 * 1024
 
+    # LinkedIn scraping via Apify — CRON ONLY. Token from env (never hardcode).
+    apify_token: str = ""
+    apify_actor_id: str = "curious_coder~linkedin-jobs-scraper"
+    apify_location: str = "India"
+    apify_count: int = 10  # results per search title (quota control)
+    apify_max_titles: int = 10  # cap distinct title searches per run
+
 
 @lru_cache
 def get_settings() -> Settings:

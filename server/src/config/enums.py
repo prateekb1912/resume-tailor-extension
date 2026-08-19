@@ -26,6 +26,7 @@ class JobSource(str, Enum):
 
 
 class ApplicationStatus(str, Enum):
+    SKIPPED = "skipped"   # auto: below the user's min fit score
     NEW = "new"
     SAVED = "saved"
     APPLIED = "applied"

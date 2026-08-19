@@ -69,8 +69,8 @@ class Preferences(BaseModel):
 
 class ProfileResponse(BaseModel):
     data: ProfileData
-    name: str = ""
-    email: EmailStr = ""
+    name: str | None = None
+    email: EmailStr | None = None
     preferences: Preferences = Field(default_factory=Preferences)
 
 
@@ -86,7 +86,8 @@ class FitAssessment(BaseModel):
 
 
 class TailorResumePayload(BaseModel):
-    email: EmailStr
+    # identity now comes from the auth token; the router fills this in
+    email: EmailStr | None = None
     job_title: str = ""
     company: str = ""
     job_description: str = ""

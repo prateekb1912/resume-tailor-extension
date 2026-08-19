@@ -4,6 +4,7 @@ from datetime import datetime, timedelta, timezone
 from fastapi import HTTPException, status
 from sqlalchemy.orm import Session
 
+from src.config.enums import ApplicationStatus
 from src.models import Job, JobMatch
 from src.schemas.profile import Preferences, ProfileData
 from src.services import llm, profile_service
@@ -68,6 +69,9 @@ def match_profile(email: str, db: Session, limit: int = _SCREEN_LIMIT) -> dict[s
                 missing_skills=fit.missing_skills,
             )
         )
+        # Auto-park low-fit jobs in the "skipped" column (don't clobber user-moved cards).
+        if job.status == ApplicationStatus.NEW.value and fit.match_score < prefs.min_match_score:
+            job.status = ApplicationStatus.SKIPPED.value
         screened += 1
     db.commit()
 
