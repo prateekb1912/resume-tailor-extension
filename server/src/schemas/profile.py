@@ -40,6 +40,7 @@ class ProfileData(BaseModel):
     linkedin: str = ""
     github: str = ""
     links: list[str] = Field(default_factory=list)
+    years_experience: float = 0  # total professional YOE, inferred on parse
     summary: str = ""
     experience: list[Experience] = Field(default_factory=list)
     education: list[Education] = Field(default_factory=list)
@@ -83,6 +84,7 @@ class InferredPreferences(BaseModel):
     # sensible search defaults derived from the résumé, so a new user isn't starting blank
     titles: list[str] = Field(default_factory=list)
     seniority: list[str] = Field(default_factory=list)
+    years_experience: float = 0
 
 
 class FitAssessment(BaseModel):

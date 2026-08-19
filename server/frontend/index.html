@@ -359,6 +359,7 @@ function renderProfile(d) {
       <div class="row2">
         <div class="fld"><label>Phone</label><input type="text" id="pd-phone" value="${esc(d.phone || "")}"></div>
         <div class="fld"><label>Location</label><input type="text" id="pd-location" value="${esc(d.location || "")}"></div>
+        <div class="fld"><label>Years of experience</label><input type="number" step="0.5" min="0" id="pd-years" value="${d.years_experience ?? 0}"></div>
       </div>
       <div class="row2">
         <div class="fld"><label>LinkedIn</label><input type="text" id="pd-linkedin" value="${esc(d.linkedin || "")}"></div>
@@ -393,6 +394,7 @@ function collectProfile() {
     name: $("pd-name").value.trim(), email: $("pd-email").value.trim(),
     phone: $("pd-phone").value.trim(), location: $("pd-location").value.trim(),
     linkedin: $("pd-linkedin").value.trim(), github: $("pd-github").value.trim(),
+    years_experience: parseFloat($("pd-years").value) || 0,
     links: splitLines($("pd-links").value), summary: $("pd-summary").value.trim(),
     experience: items("exp-list", it => ({
       title: v(it, ".exp-title"), company: v(it, ".exp-company"),

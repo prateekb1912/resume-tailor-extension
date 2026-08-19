@@ -105,7 +105,9 @@ _INFER_PREFS_PROMPT = (
     "prefixes and suffixes (return 'Backend Engineer', not 'Senior Backend Engineer II') so "
     "the search matches broadly. Base them on their actual experience and skills.\n"
     "- seniority: their level(s) as lowercase tags from: intern, junior, mid, senior, staff, "
-    "lead, principal, manager, director."
+    "lead, principal, manager, director.\n"
+    "- years_experience: total professional years of experience as a number. Sum the work "
+    "history, ignore overlaps, count internships as partial years. Exclude education-only time."
 )
 
 
@@ -186,7 +188,10 @@ _SCREEN_SYSTEM_PROMPT = """You are a strict job-fit screener helping a JOB SEEKE
 
 Judge fit on:
 - Required must-have hard skills/tools the JD requires vs. what the resume clearly demonstrates.
-- Required years/seniority vs. the candidate's actual experience.
+- Required years of experience in the JD vs. the candidate's total years (stated below). Penalize
+  clearly when the JD demands materially more experience than the candidate has; don't over-penalize
+  a small gap.
+- Seniority level fit.
 - Domain alignment with the candidate's background.
 - Location and work-type compatibility with the preferences below.
 
@@ -213,6 +218,7 @@ def screen_job(
 
     user = (
         f"My resume:\n{profile.model_dump_json()}\n\n"
+        f"Candidate total years of experience: {profile.years_experience}\n\n"
         f"Role:\nTitle: {title}\nCompany: {company}\nLocation: {location}\n\n"
         f"Job description:\n{description[:6000]}"
     )
