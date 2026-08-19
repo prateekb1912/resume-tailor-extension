@@ -1,8 +1,9 @@
 # OS
 .DS_Store
 
-# n8n workflow exports — kept local, not committed
-workflows/
+# n8n workflow exports — kept local, not committed (root-anchored so it doesn't
+# swallow .github/workflows/)
+/workflows/
 
 # Python / server
 server/.venv/

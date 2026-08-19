@@ -1,0 +1,37 @@
+name: Fetch and match jobs
+
+# The scheduled job pipeline (Greenhouse + Lever + Workable feed + LinkedIn/Apify),
+# then auto-match every onboarded profile. Runs off GitHub Actions instead of a Render
+# cron (Render crons have no free tier). Connects to the Render Postgres via repo secrets.
+
+on:
+  schedule:
+    - cron: "0 */6 * * *" # every 6 hours (UTC)
+  workflow_dispatch: {} # allow manual runs from the Actions tab
+
+concurrency:
+  group: fetch-jobs
+  cancel-in-progress: false
+
+jobs:
+  fetch:
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: server
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.12"
+      - name: Install pipenv
+        run: pipx install pipenv
+      - name: Install dependencies
+        run: pipenv install --deploy
+      - name: Run fetch + auto-match
+        env:
+          DATABASE_URL: ${{ secrets.DATABASE_URL }}
+          OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
+          ANTHROPIC_API_KEY: ${{ secrets.ANTHROPIC_API_KEY }}
+          APIFY_TOKEN: ${{ secrets.APIFY_TOKEN }}
+        run: pipenv run python -m src.jobs.fetch_jobs
