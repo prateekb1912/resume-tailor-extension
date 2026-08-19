@@ -90,7 +90,7 @@ def _store(db: Session, items: list[dict[str, Any]], seen: set[str]) -> int:
     return added
 
 
-def _board_items(db: Session, source: str) -> list[dict[str, Any]]:
+def _board_items(db: Session, source: JobSource) -> list[dict[str, Any]]:
     """Fetch every active company on a board source into the shared normalized shape."""
     scraper = _BOARD_SCRAPERS[source]
     items: list[dict[str, Any]] = []
