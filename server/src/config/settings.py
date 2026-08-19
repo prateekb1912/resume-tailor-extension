@@ -27,6 +27,16 @@ class Settings(BaseSettings):
     apify_count: int = 10  # results per search title (quota control)
     apify_max_titles: int = 10  # cap distinct title searches per run
 
+    @property
+    def sqlalchemy_url(self) -> str:
+        # Managed Postgres (Render/Supabase) hands out postgres:// or postgresql:// URLs,
+        # which SQLAlchemy maps to psycopg2. Force our installed psycopg3 driver.
+        url = self.database_url
+        for prefix in ("postgresql://", "postgres://"):
+            if url.startswith(prefix):
+                return "postgresql+psycopg://" + url[len(prefix):]
+        return url
+
 
 @lru_cache
 def get_settings() -> Settings:
