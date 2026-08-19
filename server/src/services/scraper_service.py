@@ -20,7 +20,6 @@ _SEED_COMPANIES: list[tuple[str, str, str]] = [
     (JobSource.GREENHOUSE, "robinhood", "Robinhood"),
     (JobSource.GREENHOUSE, "gitlab", "GitLab"),
     (JobSource.GREENHOUSE, "figma", "Figma"),
-    (JobSource.GREENHOUSE, "plaid", "Plaid"),
     (JobSource.GREENHOUSE, "brex", "Brex"),
     # broader industries / strong HR + People volume (verified live against the ATS APIs)
     (JobSource.GREENHOUSE, "stripe", "Stripe"),
