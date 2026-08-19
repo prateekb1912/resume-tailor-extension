@@ -24,6 +24,19 @@
   .badge { font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:1px 6px; }
   .card select { width:100%; padding:5px 8px; font-size:12px; }
   #empty { color:var(--muted); padding:24px; }
+  .overlay { position:fixed; inset:0; background:rgba(0,0,0,.55); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:10; }
+  .overlay.show { display:flex; }
+  .modal { background:var(--panel); border:1px solid var(--line); border-radius:12px; width:540px; max-width:100%; padding:18px 20px; }
+  .modal h2 { margin:0 0 4px; font-size:15px; }
+  .modal .sub { color:var(--muted); font-size:12px; margin-bottom:14px; }
+  .field { margin-bottom:12px; }
+  .field label { display:block; font-size:12px; color:var(--muted); margin-bottom:4px; }
+  .field input[type=text], .field input[type=number], .field textarea { width:100%; }
+  .field textarea { min-height:72px; resize:vertical; }
+  .row2 { display:flex; gap:10px; }
+  .row2 > div { flex:1; }
+  .checks { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; color:var(--text); }
+  .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
 </style>
 </head>
 <body>
@@ -34,15 +47,98 @@
   <button onclick="load()">Apply</button>
   <button class="primary" onclick="refresh()">↻ Fetch new jobs</button>
   <button class="primary" onclick="matchForMe()">🎯 Match for me</button>
+  <button onclick="openPrefs()">⚙ Preferences</button>
   <label style="color:var(--muted);font-size:12px;"><input type="checkbox" id="showall" onchange="load()"> show low-fit</label>
   <span id="status" style="color:var(--muted);font-size:12px;"></span>
 </header>
 <div id="board"></div>
 <div id="empty" style="display:none">No jobs yet — click “Fetch new jobs”.</div>
 
+<div class="overlay" id="prefs-overlay">
+  <div class="modal">
+    <h2>Preferences</h2>
+    <div class="sub" id="prefs-for"></div>
+    <div class="field"><label>Target titles (comma-separated)</label><input type="text" id="pf-titles" placeholder="Backend Engineer, AI Engineer"></div>
+    <div class="field"><label>Locations (comma-separated)</label><input type="text" id="pf-locations" placeholder="Bengaluru, India, Remote"></div>
+    <div class="field"><label>Seniority (comma-separated)</label><input type="text" id="pf-seniority" placeholder="mid, senior"></div>
+    <div class="field"><label>Work types</label><div class="checks">
+      <label><input type="checkbox" id="wt-remote" value="remote"> remote</label>
+      <label><input type="checkbox" id="wt-onsite" value="onsite"> onsite</label>
+      <label><input type="checkbox" id="wt-hybrid" value="hybrid"> hybrid</label>
+      <label><input type="checkbox" id="pf-relocation"> open to relocation</label>
+    </div></div>
+    <div class="field"><label>Exclude companies (comma-separated)</label><input type="text" id="pf-exclude-companies" placeholder="Turing"></div>
+    <div class="field"><label>Reject if role requires (comma-separated)</label><input type="text" id="pf-exclude-keywords" placeholder="frontend"></div>
+    <div class="row2">
+      <div class="field"><label>Max age (days)</label><input type="number" id="pf-max-age" value="7"></div>
+      <div class="field"><label>Min fit score (0-100)</label><input type="number" id="pf-min-score" value="60"></div>
+    </div>
+    <div class="field"><label>Screening instructions (free text — your judgment criteria)</label><textarea id="pf-instructions" placeholder="Reject required frontend. Core ML too hardcore; agent/LangGraph work is my strength."></textarea></div>
+    <div class="modal-actions">
+      <span id="prefs-status" style="color:var(--muted);font-size:12px;margin-right:auto;"></span>
+      <button onclick="closePrefs()">Cancel</button>
+      <button class="primary" onclick="savePrefs()">Save</button>
+    </div>
+  </div>
+</div>
+
 <script>
 const COLUMNS = ["new","saved","applied","interviewing","offer","rejected"];
 const setStatus = m => document.getElementById("status").textContent = m;
+const csv = s => s.split(",").map(x => x.trim()).filter(Boolean);
+const joinCsv = a => (a || []).join(", ");
+const $ = id => document.getElementById(id);
+
+// Preferences are per-email (per profile), so each person edits only their own.
+async function openPrefs() {
+  const email = $("email").value.trim();
+  if (!email) { setStatus("enter your email first"); return; }
+  const res = await fetch("/profile/?email=" + encodeURIComponent(email));
+  if (res.status === 404) { setStatus("no profile for that email — parse a resume first"); return; }
+  const p = (await res.json()).preferences || {};
+  $("prefs-for").textContent = "for " + email;
+  $("pf-titles").value = joinCsv(p.titles);
+  $("pf-locations").value = joinCsv(p.locations);
+  $("pf-seniority").value = joinCsv(p.seniority);
+  const wt = new Set(p.work_types || []);
+  $("wt-remote").checked = wt.has("remote");
+  $("wt-onsite").checked = wt.has("onsite");
+  $("wt-hybrid").checked = wt.has("hybrid");
+  $("pf-relocation").checked = !!p.open_to_relocation;
+  $("pf-exclude-companies").value = joinCsv(p.exclude_companies);
+  $("pf-exclude-keywords").value = joinCsv(p.exclude_keywords);
+  $("pf-max-age").value = p.max_age_days ?? 7;
+  $("pf-min-score").value = p.min_match_score ?? 60;
+  $("pf-instructions").value = p.screening_instructions || "";
+  $("prefs-status").textContent = "";
+  $("prefs-overlay").classList.add("show");
+}
+function closePrefs() { $("prefs-overlay").classList.remove("show"); }
+async function savePrefs() {
+  const email = $("email").value.trim();
+  const work_types = ["wt-remote","wt-onsite","wt-hybrid"].filter(id => $(id).checked).map(id => $(id).value);
+  const preferences = {
+    titles: csv($("pf-titles").value),
+    locations: csv($("pf-locations").value),
+    seniority: csv($("pf-seniority").value),
+    work_types,
+    open_to_relocation: $("pf-relocation").checked,
+    exclude_companies: csv($("pf-exclude-companies").value),
+    exclude_keywords: csv($("pf-exclude-keywords").value),
+    max_age_days: parseInt($("pf-max-age").value || "7", 10),
+    min_match_score: parseInt($("pf-min-score").value || "60", 10),
+    screening_instructions: $("pf-instructions").value,
+  };
+  $("prefs-status").textContent = "saving…";
+  const res = await fetch("/profile/preferences", {
+    method: "PUT",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email, preferences }),
+  });
+  if (!res.ok) { $("prefs-status").textContent = "save failed (" + res.status + ")"; return; }
+  closePrefs();
+  setStatus("preferences saved");
+}
 
 async function load() {
   const email = document.getElementById("email").value.trim();

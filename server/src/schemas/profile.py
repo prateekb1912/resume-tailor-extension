@@ -55,6 +55,7 @@ class Preferences(BaseModel):
     locations: list[str] = Field(default_factory=list)       # ["Bengaluru", "India", "Remote"]
     titles: list[str] = Field(default_factory=list)          # roles to search/tailor toward
     work_types: list[WorkType] = Field(default_factory=list)
+    seniority: list[str] = Field(default_factory=list)       # ["mid", "senior"] — judged by the LLM
     exclude_companies: list[str] = Field(default_factory=list)
     exclude_keywords: list[str] = Field(default_factory=list)  # reject if the JD requires these
     open_to_relocation: bool = False

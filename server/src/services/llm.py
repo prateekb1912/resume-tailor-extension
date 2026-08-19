@@ -99,6 +99,8 @@ def _format_preferences(preferences: Preferences) -> str:
         lines.append(f"- Open to locations: {', '.join(preferences.locations)}")
     if preferences.work_types:
         lines.append(f"- Work types: {', '.join(w.value for w in preferences.work_types)}")
+    if preferences.seniority:
+        lines.append(f"- Seniority levels: {', '.join(preferences.seniority)}")
     if preferences.titles:
         lines.append(f"- Target titles: {', '.join(preferences.titles)}")
     if preferences.exclude_keywords:
