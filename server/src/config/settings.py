@@ -20,6 +20,16 @@ class Settings(BaseSettings):
 
     max_upload_bytes: int = 5 * 1024 * 1024
 
+    # Comma-separated allowed CORS origins. "*" = allow all (dev). In prod set this to the
+    # extension origin, e.g. "chrome-extension://<published-id>". The dashboard is same-origin
+    # (served by this app), so it never needs listing here.
+    cors_origins: str = "*"
+
+    @property
+    def cors_origin_list(self) -> list[str]:
+        origins = [o.strip() for o in self.cors_origins.split(",") if o.strip()]
+        return origins or ["*"]
+
     # LinkedIn scraping via Apify — CRON ONLY. Token from env (never hardcode).
     apify_token: str = ""
     apify_actor_id: str = "curious_coder~linkedin-jobs-scraper"

@@ -28,6 +28,10 @@ services:
         generateValue: true
       - key: ENVIRONMENT
         value: production
+      # Lock this to the extension origin once published, e.g. chrome-extension://<id>.
+      # Left as * until then (dashboard is same-origin and unaffected either way).
+      - key: CORS_ORIGINS
+        value: "*"
       - key: OPENAI_API_KEY
         sync: false
       - key: ANTHROPIC_API_KEY
