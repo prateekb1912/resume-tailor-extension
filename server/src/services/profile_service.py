@@ -7,7 +7,12 @@ from fastapi import HTTPException, status
 from pypdf import PdfReader
 
 from src.models import Profile, TailorJob
-from src.schemas.profile import ProfileData, TailorResumePayload, TailoredResumeResult
+from src.schemas.profile import (
+    Preferences,
+    ProfileData,
+    TailorResumePayload,
+    TailoredResumeResult,
+)
 from src.services import llm
 
 logger = logging.getLogger(__name__)
@@ -73,7 +78,7 @@ def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> Pr
     profile = get_profile(email, db)
 
     if not profile:
-        profile = Profile(email=profile_data.email)
+        profile = Profile(email=email)
         db.add(profile)
 
     profile.data = profile_data.model_dump()
@@ -89,15 +94,33 @@ def get_profile(email: str, db: Session) -> Profile | None:
     return profile
 
 
+def set_preferences(email: str, preferences: Preferences, db: Session) -> Profile:
+    profile = get_profile(email, db)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No profile found with the associated email: {email}",
+        )
+
+    profile.preferences = preferences.model_dump()
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
 def tailor_resume_to_job(payload: TailorResumePayload, db: Session) -> TailoredResumeResult:
     profile = get_profile(payload.email, db)
     if not profile:
-        raise NameError(f"No profile found with the associated email: {payload.email}")
+        raise HTTPException(
+            status_code=404,
+            detail=f"No profile found with the associated email: {payload.email}"
+        )
 
     profile_data = ProfileData.model_validate(profile.data)
+    preferences = Preferences.model_validate(profile.preferences or {})
 
     tailored_resume = llm.tailor_resume(
-        payload.company, payload.job_title, payload.job_description, profile_data
+        payload.company, payload.job_title, payload.job_description, profile_data, preferences
     )
 
     tailor_job = TailorJob(

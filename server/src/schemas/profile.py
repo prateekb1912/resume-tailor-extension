@@ -1,5 +1,7 @@
 from pydantic import BaseModel, ConfigDict, Field, EmailStr
 
+from src.config.enums import WorkType
+
 
 class Experience(BaseModel):
     model_config = ConfigDict(extra="ignore")
@@ -47,14 +49,33 @@ class ProfileData(BaseModel):
     achievements: list[str] = Field(default_factory=list)
 
 
+class Preferences(BaseModel):
+    model_config = ConfigDict(extra="ignore")
+
+    locations: list[str] = Field(default_factory=list)       # ["Bengaluru", "India", "Remote"]
+    titles: list[str] = Field(default_factory=list)          # roles to search/tailor toward
+    work_types: list[WorkType] = Field(default_factory=list)
+    exclude_companies: list[str] = Field(default_factory=list)
+    exclude_keywords: list[str] = Field(default_factory=list)  # reject if the JD requires these
+    open_to_relocation: bool = False
+
+    max_age_days: int = 7          # freshness prefilter
+    min_match_score: int = 60      # PROCEED threshold
+    # Free-text, person-specific judgment injected verbatim into the screener prompt.
+    # e.g. "Required frontend = reject. Core ML too hardcore; agent/LangGraph work is my strength."
+    screening_instructions: str = ""
+
+
 class ProfileResponse(BaseModel):
     data: ProfileData
     name: str = ""
     email: EmailStr = ""
+    preferences: Preferences = Field(default_factory=Preferences)
 
 
-class ProfileIn(BaseModel):
+class PreferencesUpdate(BaseModel):
     email: EmailStr
+    preferences: Preferences
 
 
 class FitAssessment(BaseModel):

@@ -1,10 +1,12 @@
 import logging
+from pathlib import Path
 
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
+from fastapi.staticfiles import StaticFiles
 
 from src.config.settings import settings
-from src.routers import profile, resume
+from src.routers import jobs, profile, resume
 
 logging.basicConfig(level=logging.INFO)
 
@@ -19,6 +21,11 @@ app.add_middleware(
 
 app.include_router(resume.router, prefix="/resume", tags=["resume"])
 app.include_router(profile.router, prefix="/profile", tags=["profile"])
+app.include_router(jobs.router, prefix="/jobs", tags=["jobs"])
+
+# Kanban dashboard served at /app  (same origin as the API -> no CORS needed)
+_FRONTEND = Path(__file__).parent.parent / "frontend"
+app.mount("/app", StaticFiles(directory=str(_FRONTEND), html=True), name="frontend")
 
 
 @app.get("/health")

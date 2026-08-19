@@ -1,0 +1,126 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tailr — Jobs</title>
+<style>
+  :root { --bg:#0f1420; --panel:#171f2e; --card:#1e293b; --line:#2b3a52; --text:#e6edf6; --muted:#93a3ba; --accent:#5b8cff; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  header { padding:14px 18px; border-bottom:1px solid var(--line); display:flex; gap:10px; align-items:center; flex-wrap:wrap; }
+  header h1 { font-size:16px; margin:0 10px 0 0; }
+  input, button, select { font:inherit; color:var(--text); background:var(--panel); border:1px solid var(--line); border-radius:8px; padding:7px 10px; }
+  button { cursor:pointer; }
+  button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
+  #board { display:flex; gap:12px; padding:16px; overflow-x:auto; align-items:flex-start; }
+  .col { background:var(--panel); border:1px solid var(--line); border-radius:12px; width:280px; flex:0 0 280px; }
+  .col h2 { font-size:12px; text-transform:uppercase; letter-spacing:.6px; color:var(--muted); margin:0; padding:12px 14px; border-bottom:1px solid var(--line); display:flex; justify-content:space-between; }
+  .col-body { padding:10px; display:flex; flex-direction:column; gap:8px; min-height:60px; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 11px; }
+  .card a { color:var(--text); font-weight:600; text-decoration:none; font-size:13.5px; }
+  .card a:hover { color:var(--accent); }
+  .meta { color:var(--muted); font-size:12px; margin:4px 0 8px; }
+  .badge { font-size:10px; text-transform:uppercase; letter-spacing:.4px; color:var(--accent); border:1px solid var(--line); border-radius:6px; padding:1px 6px; }
+  .card select { width:100%; padding:5px 8px; font-size:12px; }
+  #empty { color:var(--muted); padding:24px; }
+</style>
+</head>
+<body>
+<header>
+  <h1>Tailr — Jobs</h1>
+  <input id="email" placeholder="filter by your email (prefs)" size="26">
+  <input id="q" placeholder="search title / company" size="20">
+  <button onclick="load()">Apply</button>
+  <button class="primary" onclick="refresh()">↻ Fetch new jobs</button>
+  <button class="primary" onclick="matchForMe()">🎯 Match for me</button>
+  <label style="color:var(--muted);font-size:12px;"><input type="checkbox" id="showall" onchange="load()"> show low-fit</label>
+  <span id="status" style="color:var(--muted);font-size:12px;"></span>
+</header>
+<div id="board"></div>
+<div id="empty" style="display:none">No jobs yet — click “Fetch new jobs”.</div>
+
+<script>
+const COLUMNS = ["new","saved","applied","interviewing","offer","rejected"];
+const setStatus = m => document.getElementById("status").textContent = m;
+
+async function load() {
+  const email = document.getElementById("email").value.trim();
+  const q = document.getElementById("q").value.trim();
+  const params = new URLSearchParams();
+  if (email) params.set("email", email);
+  if (q) params.set("q", q);
+  if (document.getElementById("showall").checked) params.set("min_score", "0");
+  const res = await fetch("/jobs/?" + params.toString());
+  const jobs = await res.json();
+  render(jobs);
+  setStatus(jobs.length + " jobs");
+  document.getElementById("empty").style.display = jobs.length ? "none" : "block";
+}
+
+function render(jobs) {
+  const byStatus = Object.fromEntries(COLUMNS.map(c => [c, []]));
+  for (const j of jobs) (byStatus[j.status] || byStatus["new"]).push(j);
+  const board = document.getElementById("board");
+  board.innerHTML = "";
+  for (const col of COLUMNS) {
+    const items = byStatus[col];
+    const el = document.createElement("div");
+    el.className = "col";
+    el.innerHTML = `<h2>${col}<span>${items.length}</span></h2><div class="col-body"></div>`;
+    const body = el.querySelector(".col-body");
+    for (const j of items) body.appendChild(cardEl(j));
+    board.appendChild(el);
+  }
+}
+
+function cardEl(j) {
+  const el = document.createElement("div");
+  el.className = "card";
+  const loc = j.location ? " · " + j.location : "";
+  const opts = COLUMNS.map(c => `<option value="${c}" ${c===j.status?"selected":""}>${c}</option>`).join("");
+  const score = (j.match_score != null)
+    ? `<span class="badge" title="${(j.reason||"").replace(/"/g,"'")}">${j.match_score}% fit</span> ` : "";
+  el.innerHTML = `
+    <a href="${j.url}" target="_blank" rel="noopener">${j.title}</a>
+    <div class="meta">${score}${j.company}${loc} · <span class="badge">${j.source}</span></div>
+    <select>${opts}</select>`;
+  el.querySelector("select").addEventListener("change", e => move(j.id, e.target.value));
+  return el;
+}
+
+async function move(id, status) {
+  await fetch("/jobs/" + id, {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ status }),
+  });
+  load();
+}
+
+async function refresh() {
+  setStatus("fetching…");
+  const res = await fetch("/jobs/refresh", { method: "POST" });
+  const r = await res.json();
+  setStatus(`+${r.new_jobs} new jobs`);
+  load();
+}
+
+async function matchForMe() {
+  const email = document.getElementById("email").value.trim();
+  if (!email) { setStatus("enter your email first"); return; }
+  setStatus("screening against your preferences…");
+  const res = await fetch("/jobs/match", {
+    method: "POST",
+    headers: { "Content-Type": "application/json" },
+    body: JSON.stringify({ email }),
+  });
+  const r = await res.json();
+  setStatus(`screened ${r.screened} (of ${r.candidates} matching prefs, ${r.remaining} left)`);
+  load();
+}
+
+load();
+</script>
+</body>
+</html>

@@ -5,7 +5,7 @@ from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from pydantic import SecretStr
 
-from src.schemas.profile import ProfileData, TailoredResumeResult
+from src.schemas.profile import FitAssessment, Preferences, ProfileData, TailoredResumeResult
 from src.config.settings import settings
 from src.config.enums import ModelNames
 
@@ -37,8 +37,9 @@ _TAILOR_RESUME_PROMPT = """
     - Judge experience: compare required years, seniority, and level with the candidate's
       demonstrated experience
     - Judge domain alignment with the candidate's background
-    - Judge location compatibility. The candidate is based in Bengaluru, India and is
-      open to roles located in India or fully remote
+    - Judge location and work-type compatibility against the candidate preferences below
+    - REJECT if the role requires any of the candidate's excluded skills/keywords, is at an
+      excluded company, or is a work type the candidate is not open to
     - Produce an integer match score from 0 to 100
     - Set decision to "REJECT" if the match score is below 60, the candidate is missing
       the majority of must-have hard skills, or the required experience clearly exceeds
@@ -67,6 +68,9 @@ _TAILOR_RESUME_PROMPT = """
     must-have skills, or an empty list when none are missing. Do not return markdown,
     explanations, a preamble, or the internal analysis.
 
+    CANDIDATE PREFERENCES:
+    {preferences}
+
     Job Title: {job_title}
     Company: {company}
 
@@ -89,14 +93,36 @@ def extract_resume(text: str) -> dict[str, Any]:
     return response["structured_response"]
 
 
+def _format_preferences(preferences: Preferences) -> str:
+    lines: list[str] = []
+    if preferences.locations:
+        lines.append(f"- Open to locations: {', '.join(preferences.locations)}")
+    if preferences.work_types:
+        lines.append(f"- Work types: {', '.join(w.value for w in preferences.work_types)}")
+    if preferences.titles:
+        lines.append(f"- Target titles: {', '.join(preferences.titles)}")
+    if preferences.exclude_keywords:
+        lines.append(f"- Reject if the role requires: {', '.join(preferences.exclude_keywords)}")
+    if preferences.exclude_companies:
+        lines.append(f"- Exclude companies: {', '.join(preferences.exclude_companies)}")
+    if preferences.open_to_relocation:
+        lines.append("- Open to relocation")
+    return "\n    ".join(lines) if lines else "- No specific preferences provided"
+
+
 def tailor_resume(
-    company: str, job_title: str, job_description: str, profile: ProfileData
+    company: str,
+    job_title: str,
+    job_description: str,
+    profile: ProfileData,
+    preferences: Preferences,
 ) -> TailoredResumeResult:
     system_prompt = _TAILOR_RESUME_PROMPT.format(
         job_title=job_title,
         company=company,
         job_description=job_description,
         resume_profile=profile.model_dump_json(),
+        preferences=_format_preferences(preferences),
     )
     model = ChatAnthropic(
         model_name=ModelNames.CLAUDE_SONNET_5,
@@ -123,4 +149,44 @@ def tailor_resume(
         }
     )
 
+    return response["structured_response"]
+
+
+# Fixed, person-agnostic screener scaffold. Everything opinionated is injected from the
+# user's Preferences — so a different user (with different prefs) just gets different results.
+_SCREEN_SYSTEM_PROMPT = """You are a strict job-fit screener helping a JOB SEEKER decide whether to apply. Do NOT write or rewrite a resume.
+
+Judge fit on:
+- Required must-have hard skills/tools the JD requires vs. what the resume clearly demonstrates.
+- Required years/seniority vs. the candidate's actual experience.
+- Domain alignment with the candidate's background.
+- Location and work-type compatibility with the preferences below.
+
+CANDIDATE PREFERENCES:
+{preferences}
+
+CANDIDATE-SPECIFIC CRITERIA (the candidate's own words — weight these heavily):
+{instructions}
+
+Return an integer match_score (0-100), a one or two sentence reason, and missing_skills
+(the must-have skills the candidate lacks, or an empty list when none are missing)."""
+
+
+def screen_job(
+    profile: ProfileData, title: str, company: str, location: str, description: str,
+    preferences: Preferences,
+) -> FitAssessment:
+    system_prompt = _SCREEN_SYSTEM_PROMPT.format(
+        preferences=_format_preferences(preferences),
+        instructions=preferences.screening_instructions or "None provided.",
+    )
+    model = ChatOpenAI(model=ModelNames.GPT_5_5, api_key=SecretStr(settings.openai_api_key))
+    agent = create_agent(model=model, system_prompt=system_prompt, response_format=FitAssessment)
+
+    user = (
+        f"My resume:\n{profile.model_dump_json()}\n\n"
+        f"Role:\nTitle: {title}\nCompany: {company}\nLocation: {location}\n\n"
+        f"Job description:\n{description[:6000]}"
+    )
+    response = agent.invoke({"messages": [{"role": "user", "content": user}]})
     return response["structured_response"]
