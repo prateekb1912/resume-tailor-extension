@@ -94,6 +94,21 @@ def get_profile(email: str, db: Session) -> Profile | None:
     return profile
 
 
+def update_profile_data(email: str, data: ProfileData, db: Session) -> Profile:
+    profile = get_profile(email, db)
+    if not profile:
+        raise HTTPException(
+            status_code=status.HTTP_404_NOT_FOUND,
+            detail=f"No profile found with the associated email: {email}",
+        )
+
+    profile.data = data.model_dump()
+    profile.name = data.name or profile.name
+    db.commit()
+    db.refresh(profile)
+    return profile
+
+
 def set_preferences(email: str, preferences: Preferences, db: Session) -> Profile:
     profile = get_profile(email, db)
     if not profile:
