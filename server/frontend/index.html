@@ -86,7 +86,13 @@
   </span>
 </header>
 <div id="board"></div>
-<div id="empty" style="display:none">No jobs yet — click “Fetch”.</div>
+<div id="empty" style="display:none;color:var(--muted);padding:24px;line-height:1.7;">
+  <b style="color:var(--text)">Your board is empty — nothing has been scored for you yet.</b><br>
+  1. <b>⚙ Preferences</b> → set your target <b>titles</b> (this is what makes matching relevant).<br>
+  2. <b>↻ Fetch</b> to pull the latest jobs into the shared pool (optional — already populated).<br>
+  3. <b>🎯 Match for me</b> to score jobs against your profile — scored cards then appear here.<br>
+  <span style="font-size:12px">Low-fit jobs are auto-parked in the collapsed <b>Skipped</b> column.</span>
+</div>
 
 <div class="overlay" id="auth-overlay">
   <div class="modal">
@@ -428,9 +434,12 @@ async function parseResume() {
   $("resume-status").textContent = "parsing… (a few seconds)";
   const res = await api("/resume/parse", { method: "POST", body: fd });
   if (!res.ok) { $("resume-status").textContent = "parse failed (" + res.status + ")"; return; }
-  const p = (await res.json()).data || {};
-  renderProfile(p);
-  $("resume-summary").textContent = "Parsed from PDF — review the fields and click Save profile.";
+  const body = await res.json();
+  renderProfile(body.data || {});
+  const titles = (body.preferences || {}).titles || [];
+  $("resume-summary").textContent = titles.length
+    ? "Parsed ✓ — inferred search titles: " + titles.join(", ") + " (edit under ⚙ Preferences). Review fields, then Save."
+    : "Parsed from PDF — review the fields and click Save profile.";
   $("resume-status").textContent = "parsed ✓";
 }
 
