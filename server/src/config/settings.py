@@ -20,6 +20,8 @@ class Settings(BaseSettings):
 
     max_upload_bytes: int = 5 * 1024 * 1024
 
+    match_workers: int = 8  # concurrent LLM screens per matching run
+
     # Comma-separated allowed CORS origins. "*" = allow all (dev). In prod set this to the
     # extension origin, e.g. "chrome-extension://<published-id>". The dashboard is same-origin
     # (served by this app), so it never needs listing here.
