@@ -31,8 +31,8 @@ def parse_resume(
             status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
             detail="File too large",
         )
-    parsed = profile_service.create_profile_with_resume(profile.email, file_bytes, db)
-    return ProfileResponse(data=parsed, name=parsed.name, email=profile.email)
+    updated = profile_service.create_profile_with_resume(profile.email, file_bytes, db)
+    return ProfileResponse.model_validate(updated.to_dict())
 
 
 @router.post("/tailor")

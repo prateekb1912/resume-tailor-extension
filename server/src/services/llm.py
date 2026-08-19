@@ -5,7 +5,13 @@ from langchain_openai import ChatOpenAI
 from langchain_anthropic import ChatAnthropic
 from pydantic import SecretStr
 
-from src.schemas.profile import FitAssessment, Preferences, ProfileData, TailoredResumeResult
+from src.schemas.profile import (
+    FitAssessment,
+    InferredPreferences,
+    Preferences,
+    ProfileData,
+    TailoredResumeResult,
+)
 from src.config.settings import settings
 from src.config.enums import ModelNames
 
@@ -90,6 +96,26 @@ def extract_resume(text: str) -> dict[str, Any]:
         response_format=ProfileData,
     )
     response = agent.invoke({"messages": [{"role": "user", "content": f"Resume text:\n\n{text}"}]})
+    return response["structured_response"]
+
+
+_INFER_PREFS_PROMPT = (
+    "From the candidate's resume, infer sensible DEFAULT job-search preferences.\n"
+    "- titles: 3-6 concise, canonical job titles they should search for. Strip seniority "
+    "prefixes and suffixes (return 'Backend Engineer', not 'Senior Backend Engineer II') so "
+    "the search matches broadly. Base them on their actual experience and skills.\n"
+    "- seniority: their level(s) as lowercase tags from: intern, junior, mid, senior, staff, "
+    "lead, principal, manager, director."
+)
+
+
+def infer_preferences(profile: ProfileData) -> InferredPreferences:
+    """One cheap call to seed a new user's search prefs so matching is relevant day one."""
+    model = ChatOpenAI(model=ModelNames.GPT_5_5, api_key=SecretStr(settings.openai_api_key))
+    agent = create_agent(
+        model=model, system_prompt=_INFER_PREFS_PROMPT, response_format=InferredPreferences
+    )
+    response = agent.invoke({"messages": [{"role": "user", "content": profile.model_dump_json()}]})
     return response["structured_response"]
 
 

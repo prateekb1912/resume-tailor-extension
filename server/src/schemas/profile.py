@@ -79,6 +79,12 @@ class PreferencesUpdate(BaseModel):
     preferences: Preferences
 
 
+class InferredPreferences(BaseModel):
+    # sensible search defaults derived from the résumé, so a new user isn't starting blank
+    titles: list[str] = Field(default_factory=list)
+    seniority: list[str] = Field(default_factory=list)
+
+
 class FitAssessment(BaseModel):
     match_score: int = Field(ge=0, le=100)
     reason: str

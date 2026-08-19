@@ -58,7 +58,24 @@ def _extract_pdf_text(reader: PdfReader) -> str:
     return text
 
 
-def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> ProfileData:
+def _infer_preferences(profile: Profile, profile_data: ProfileData) -> None:
+    """Seed search prefs from the résumé, but never clobber prefs the user already set."""
+    prefs = Preferences.model_validate(profile.preferences or {})
+    if prefs.titles:
+        return
+    try:
+        inferred = llm.infer_preferences(profile_data)
+    except Exception as exc:  # noqa: BLE001 — inference is a nicety, never fail the parse
+        logger.warning("preference inference failed: %s", exc)
+        return
+    prefs.titles = inferred.titles
+    prefs.seniority = inferred.seniority
+    if profile_data.location and not prefs.locations:
+        prefs.locations = [profile_data.location]
+    profile.preferences = prefs.model_dump()
+
+
+def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> Profile:
     reader = _read_pdf(file_bytes)
     text = _extract_pdf_text(reader)
     links = _extract_pdf_links(reader)
@@ -83,9 +100,11 @@ def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> Pr
 
     profile.data = profile_data.model_dump()
     profile.name = profile_data.name
+    _infer_preferences(profile, profile_data)
 
     db.commit()
-    return profile_data
+    db.refresh(profile)
+    return profile
 
 
 def get_profile(email: str, db: Session) -> Profile | None:
