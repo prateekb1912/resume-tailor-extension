@@ -15,8 +15,10 @@ services:
     runtime: python
     rootDir: server
     plan: free
-    buildCommand: pipenv install --deploy
-    startCommand: pipenv run alembic upgrade head && pipenv run uvicorn src.main:app --host 0.0.0.0 --port $PORT
+    # Render's Python image has no pipenv — install it, then install deps into the system
+    # env (--system) so the runtime can call alembic/uvicorn directly, no `pipenv run`.
+    buildCommand: pip install pipenv && pipenv install --deploy --system
+    startCommand: alembic upgrade head && uvicorn src.main:app --host 0.0.0.0 --port $PORT
     envVars:
       - key: DATABASE_URL
         fromDatabase:
