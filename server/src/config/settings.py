@@ -27,6 +27,10 @@ class Settings(BaseSettings):
     apify_count: int = 10  # results per search title (quota control)
     apify_max_titles: int = 10  # cap distinct title searches per run
 
+    # Workable global-feed discovery (free, no token). Bounds keep /jobs/refresh snappy.
+    workable_max_pages: int = 3       # feed pages per location (~100 jobs/page)
+    workable_max_locations: int = 3   # distinct user locations queried per run
+
     @property
     def sqlalchemy_url(self) -> str:
         # Managed Postgres (Render/Supabase) hands out postgres:// or postgresql:// URLs,

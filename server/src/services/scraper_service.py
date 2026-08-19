@@ -36,10 +36,10 @@ _SEED_COMPANIES: list[tuple[str, str, str]] = [
     (JobSource.LEVER, "spotify", "Spotify"),
 ]
 
+# Company-list ("board") sources. Workable is NOT here — it's a feed source (see below).
 _BOARD_SCRAPERS = {
     JobSource.GREENHOUSE: greenhouse,
     JobSource.LEVER: lever,
-    JobSource.WORKABLE: workable,
 }
 
 
@@ -60,21 +60,6 @@ def seed_companies(db: Session) -> int:
         db.add(Company(source=source, board=board, name=name, active=True))
         added += 1
     db.commit()
-    return added
-
-
-def discover_companies(db: Session) -> int:
-    """Automated discovery (vs. a hand-kept list): pull company slugs from Workable's
-    global jobs feed for the configured location. Greenhouse/Lever discovery (Common Crawl /
-    Wayback, per the n8n seeding workflow) can be added the same way."""
-    added = 0
-    for account, name in workable.discover(settings.apify_location).items():
-        if db.query(Company).filter_by(source=JobSource.WORKABLE, board=account).first():
-            continue
-        db.add(Company(source=JobSource.WORKABLE, board=account, name=name, active=True))
-        added += 1
-    db.commit()
-    logger.info("discovered %s new workable companies", added)
     return added
 
 
@@ -120,6 +105,34 @@ def _board_items(db: Session, source: str) -> list[dict[str, Any]]:
     return items
 
 
+def _pref_locations(db: Session) -> list[str]:
+    """Distinct locations across all users' preferences — drives Workable feed queries."""
+    locations: list[str] = []
+    for (prefs,) in db.query(Profile.preferences).all():
+        for loc in (prefs or {}).get("locations", []):
+            if loc and loc not in locations:
+                locations.append(loc)
+    return locations[: settings.workable_max_locations]
+
+
+def _workable_items(db: Session) -> list[dict[str, Any]]:
+    """Feed-based discovery: query Workable's global feed per user location (no company list)."""
+    locations = _pref_locations(db)
+    if not locations:
+        logger.info("no user preference locations configured — skipping Workable")
+        return []
+    items: list[dict[str, Any]] = []
+    for location in locations:
+        try:
+            raw_jobs = workable.fetch_feed(location, max_pages=settings.workable_max_pages)
+        except Exception as exc:  # noqa: BLE001 — skip a bad feed page, keep going
+            logger.warning("workable feed failed for %s: %s", location, exc)
+            continue
+        for raw in raw_jobs:
+            items.append({**raw, "source": JobSource.WORKABLE})
+    return items
+
+
 def _linkedin_titles(db: Session) -> list[str]:
     """Search titles come straight from what users configured in their preferences —
     never a hardcoded list. No users, no titles -> LinkedIn is skipped."""
@@ -157,10 +170,11 @@ def fetch_jobs(db: Session, include_linkedin: bool = False) -> int:
     CRON ONLY (consumes Apify quota) — the manual /jobs/refresh must pass False."""
     seen: set[str] = {key for (key,) in db.query(Job.dedup_key).all()}
     new_count = 0
-    # Workable is written but its API mapping/discovery still needs fixing — left out of the
-    # loop until then (add JobSource.WORKABLE back once discover_companies is corrected).
+    # Free board sources (curated company lists).
     for source in (JobSource.GREENHOUSE, JobSource.LEVER):
         new_count += _store(db, _board_items(db, source), seen)
+    # Free feed source (auto-discovery — any company hiring on Workable in a user's location).
+    new_count += _store(db, _workable_items(db), seen)
     if include_linkedin:
         new_count += _store(db, _linkedin_items(db), seen)
     return new_count

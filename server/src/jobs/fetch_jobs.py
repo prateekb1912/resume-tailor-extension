@@ -20,7 +20,7 @@ def main() -> None:
     db = SessionLocal()
     try:
         seeded = scraper_service.seed_companies(db)
-        # discover_companies() (Workable feed) is WIP — re-enable once its API mapping is fixed.
+        # fetch_jobs also runs Workable feed discovery (per user location) + LinkedIn.
         new_jobs = scraper_service.fetch_jobs(db, include_linkedin=True)
         logger.info("seeded %s companies; fetched %s new jobs", seeded, new_jobs)
     finally:
