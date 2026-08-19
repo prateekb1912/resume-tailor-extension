@@ -20,9 +20,9 @@
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
   button.primary:hover { filter:brightness(1.05); }
 
-  #board { display:flex; gap:14px; padding:16px; overflow-x:auto; align-items:flex-start; }
-  .col { width:300px; flex:0 0 300px; }
-  .col-head { display:flex; align-items:center; justify-content:space-between; padding:2px 4px 10px; }
+  #board { display:flex; gap:10px; padding:14px 16px; align-items:flex-start; }
+  .col { flex:1 1 0; min-width:0; background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 8px 10px; box-shadow:var(--shadow); }
+  .col-head { display:flex; align-items:center; justify-content:space-between; padding:4px 4px 8px; border-bottom:1px solid var(--line2); margin-bottom:6px; }
   .pill { font-size:12px; font-weight:600; padding:3px 12px; border-radius:999px; text-transform:capitalize; }
   .count { color:var(--muted); font-size:12px; font-weight:600; }
   .pill.new{background:#e7ecfe;color:#3b5bdb} .pill.saved{background:#efe7fd;color:#7048e8}
@@ -30,18 +30,18 @@
   .pill.offer{background:#e4f7ec;color:#2f9e44} .pill.rejected{background:#fde8ec;color:#d6336c}
   .pill.skipped{background:#fbe8d3;color:#c26a1f}
   .col-head { cursor:pointer; user-select:none; }
-  .col-body { display:flex; flex-direction:column; gap:10px; min-height:80px; padding:4px; border-radius:12px; }
+  .col-body { display:flex; flex-direction:column; gap:8px; min-height:60px; padding:2px; border-radius:10px; }
   .col-body.drop { background:#eef1fe; outline:2px dashed #c3cbf5; }
-  .col.collapsed { width:46px; flex:0 0 46px; }
+  .col.collapsed { flex:0 0 40px; }
   .col.collapsed .col-body { display:none; }
-  .col.collapsed .col-head { writing-mode:vertical-rl; height:auto; padding:12px 0; gap:10px; justify-content:flex-start; }
+  .col.collapsed .col-head { writing-mode:vertical-rl; height:auto; padding:10px 0; gap:10px; justify-content:flex-start; border-bottom:none; margin-bottom:0; }
 
-  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:14px 15px; box-shadow:var(--shadow); cursor:grab; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 11px; box-shadow:var(--shadow); cursor:grab; }
   .card:active { cursor:grabbing; }
-  .card h3 { margin:0 0 10px; font-size:17px; font-weight:600; line-height:1.25; }
-  .field { margin-bottom:9px; }
-  .field .lbl { display:flex; align-items:center; gap:6px; color:var(--muted); font-size:12px; margin-bottom:2px; }
-  .field .val { font-size:13.5px; word-break:break-word; }
+  .card h3 { margin:0 0 8px; font-size:14px; font-weight:600; line-height:1.25; }
+  .field { margin-bottom:7px; }
+  .field .lbl { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:11px; margin-bottom:1px; }
+  .field .val { font-size:12.5px; word-break:break-word; }
   .field a { color:var(--link); text-decoration:none; }
   .field a:hover { text-decoration:underline; }
   .score { display:inline-block; font-weight:700; font-size:13px; padding:1px 8px; border-radius:6px; }
@@ -60,6 +60,14 @@
   .row2 { display:flex; gap:10px; } .row2 > div { flex:1; }
   .checks { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; }
   .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
+  .modal.wide { width:720px; }
+  .sec { margin-top:18px; }
+  .sec > .sec-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
+  .sec > .sec-head h3 { margin:0; font-size:13px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }
+  .item { border:1px solid var(--line); border-radius:10px; padding:12px; margin-bottom:10px; background:#fafafa; }
+  .item .item-top { display:flex; justify-content:flex-end; margin-bottom:-6px; }
+  .btn-sm { font-size:12px; padding:3px 8px; }
+  .btn-del { color:#d6336c; border-color:#f3c6d4; background:#fff; }
 </style>
 </head>
 <body>
@@ -95,16 +103,23 @@
 </div>
 
 <div class="overlay" id="resume-overlay">
-  <div class="modal">
-    <h2>Resume</h2>
+  <div class="modal wide">
+    <h2>Profile</h2>
     <div class="sub" id="resume-for"></div>
-    <div id="resume-summary" style="margin-bottom:12px;font-size:13px;"></div>
-    <div class="fld"><label>Upload PDF résumé — parses &amp; saves your profile</label>
-      <input type="file" id="resume-file" accept="application/pdf"></div>
-    <div class="modal-actions">
+    <div class="fld"><label>Upload a PDF résumé to (re)parse — fills the fields below, which you can edit before saving</label>
+      <div style="display:flex;gap:8px;align-items:center;">
+        <input type="file" id="resume-file" accept="application/pdf" style="flex:1;">
+        <button onclick="parseResume()">Parse PDF</button>
+      </div>
+    </div>
+    <div id="resume-summary" style="margin:8px 0;font-size:12px;color:var(--muted);"></div>
+
+    <div id="profile-form"></div>
+
+    <div class="modal-actions" style="position:sticky;bottom:0;background:#fff;padding-top:10px;">
       <span id="resume-status" style="color:var(--muted);font-size:12px;margin-right:auto;"></span>
       <button onclick="closeResume()">Close</button>
-      <button class="primary" onclick="parseResume()">Parse &amp; Save</button>
+      <button class="primary" onclick="saveProfile()">Save profile</button>
     </div>
   </div>
 </div>
@@ -284,19 +299,127 @@ async function matchForMe() {
   setStatus(`screened ${r.screened} (of ${r.candidates} matching prefs, ${r.remaining} left)`); load();
 }
 
+// ---- profile editor -----------------------------------------------------
+const linesOf = a => (a || []).map(esc).join("\n");
+const splitLines = t => t.split("\n").map(s => s.trim()).filter(Boolean);
+
+function expItem(e = {}) {
+  return `<div class="item">
+    <div class="item-top"><button type="button" class="btn-sm btn-del" onclick="this.closest('.item').remove()">Remove</button></div>
+    <div class="row2">
+      <div class="fld"><label>Title</label><input type="text" class="exp-title" value="${esc(e.title || "")}"></div>
+      <div class="fld"><label>Company</label><input type="text" class="exp-company" value="${esc(e.company || "")}"></div>
+    </div>
+    <div class="row2">
+      <div class="fld"><label>Start</label><input type="text" class="exp-start" value="${esc(e.startDate || "")}"></div>
+      <div class="fld"><label>End</label><input type="text" class="exp-end" value="${esc(e.endDate || "")}"></div>
+    </div>
+    <div class="fld"><label>Bullets (one per line)</label><textarea class="exp-bullets">${linesOf(e.bullets)}</textarea></div>
+  </div>`;
+}
+function eduItem(e = {}) {
+  return `<div class="item">
+    <div class="item-top"><button type="button" class="btn-sm btn-del" onclick="this.closest('.item').remove()">Remove</button></div>
+    <div class="row2">
+      <div class="fld"><label>Degree</label><input type="text" class="edu-degree" value="${esc(e.degree || "")}"></div>
+      <div class="fld"><label>School</label><input type="text" class="edu-school" value="${esc(e.school || "")}"></div>
+    </div>
+    <div class="row2">
+      <div class="fld"><label>Year</label><input type="text" class="edu-year" value="${esc(e.year || "")}"></div>
+      <div class="fld"><label>GPA</label><input type="text" class="edu-gpa" value="${esc(e.gpa || "")}"></div>
+    </div>
+  </div>`;
+}
+function projItem(p = {}) {
+  return `<div class="item">
+    <div class="item-top"><button type="button" class="btn-sm btn-del" onclick="this.closest('.item').remove()">Remove</button></div>
+    <div class="fld"><label>Name</label><input type="text" class="proj-name" value="${esc(p.name || "")}"></div>
+    <div class="fld"><label>Description</label><input type="text" class="proj-desc" value="${esc(p.description || "")}"></div>
+    <div class="fld"><label>Bullets (one per line)</label><textarea class="proj-bullets">${linesOf(p.bullets)}</textarea></div>
+  </div>`;
+}
+const addExp = (e = {}) => $("exp-list").insertAdjacentHTML("beforeend", expItem(e));
+const addEdu = (e = {}) => $("edu-list").insertAdjacentHTML("beforeend", eduItem(e));
+const addProj = (p = {}) => $("proj-list").insertAdjacentHTML("beforeend", projItem(p));
+
+function renderProfile(d) {
+  d = d || {};
+  $("profile-form").innerHTML = `
+    <div class="sec"><div class="sec-head"><h3>Contact</h3></div>
+      <div class="row2">
+        <div class="fld"><label>Name</label><input type="text" id="pd-name" value="${esc(d.name || "")}"></div>
+        <div class="fld"><label>Email</label><input type="text" id="pd-email" value="${esc(d.email || "")}"></div>
+      </div>
+      <div class="row2">
+        <div class="fld"><label>Phone</label><input type="text" id="pd-phone" value="${esc(d.phone || "")}"></div>
+        <div class="fld"><label>Location</label><input type="text" id="pd-location" value="${esc(d.location || "")}"></div>
+      </div>
+      <div class="row2">
+        <div class="fld"><label>LinkedIn</label><input type="text" id="pd-linkedin" value="${esc(d.linkedin || "")}"></div>
+        <div class="fld"><label>GitHub</label><input type="text" id="pd-github" value="${esc(d.github || "")}"></div>
+      </div>
+      <div class="fld"><label>Other links (one per line)</label><textarea id="pd-links">${linesOf(d.links)}</textarea></div>
+    </div>
+    <div class="sec"><div class="sec-head"><h3>Summary</h3></div>
+      <div class="fld"><textarea id="pd-summary">${esc(d.summary || "")}</textarea></div>
+    </div>
+    <div class="sec"><div class="sec-head"><h3>Experience</h3><button type="button" class="btn-sm" onclick="addExp()">+ Add</button></div>
+      <div id="exp-list"></div></div>
+    <div class="sec"><div class="sec-head"><h3>Education</h3><button type="button" class="btn-sm" onclick="addEdu()">+ Add</button></div>
+      <div id="edu-list"></div></div>
+    <div class="sec"><div class="sec-head"><h3>Projects</h3><button type="button" class="btn-sm" onclick="addProj()">+ Add</button></div>
+      <div id="proj-list"></div></div>
+    <div class="sec"><div class="sec-head"><h3>Skills</h3></div>
+      <div class="fld"><label>One per line</label><textarea id="pd-skills">${linesOf(d.skills)}</textarea></div></div>
+    <div class="sec"><div class="sec-head"><h3>Certifications</h3></div>
+      <div class="fld"><label>One per line</label><textarea id="pd-certifications">${linesOf(d.certifications)}</textarea></div></div>
+    <div class="sec"><div class="sec-head"><h3>Achievements</h3></div>
+      <div class="fld"><label>One per line</label><textarea id="pd-achievements">${linesOf(d.achievements)}</textarea></div></div>`;
+  (d.experience || []).forEach(e => addExp(e));
+  (d.education || []).forEach(e => addEdu(e));
+  (d.projects || []).forEach(p => addProj(p));
+}
+
+function collectProfile() {
+  const items = (listId, map) => [...document.querySelectorAll("#" + listId + " .item")].map(map);
+  const v = (root, sel) => root.querySelector(sel).value.trim();
+  return {
+    name: $("pd-name").value.trim(), email: $("pd-email").value.trim(),
+    phone: $("pd-phone").value.trim(), location: $("pd-location").value.trim(),
+    linkedin: $("pd-linkedin").value.trim(), github: $("pd-github").value.trim(),
+    links: splitLines($("pd-links").value), summary: $("pd-summary").value.trim(),
+    experience: items("exp-list", it => ({
+      title: v(it, ".exp-title"), company: v(it, ".exp-company"),
+      startDate: v(it, ".exp-start"), endDate: v(it, ".exp-end"),
+      bullets: splitLines(it.querySelector(".exp-bullets").value),
+    })),
+    education: items("edu-list", it => ({
+      degree: v(it, ".edu-degree"), school: v(it, ".edu-school"),
+      year: v(it, ".edu-year"), gpa: v(it, ".edu-gpa"),
+    })),
+    projects: items("proj-list", it => ({
+      name: v(it, ".proj-name"), description: v(it, ".proj-desc"),
+      bullets: splitLines(it.querySelector(".proj-bullets").value),
+    })),
+    skills: splitLines($("pd-skills").value),
+    certifications: splitLines($("pd-certifications").value),
+    achievements: splitLines($("pd-achievements").value),
+  };
+}
+
 async function openResume() {
   $("resume-for").textContent = "for " + ($("whoami").textContent || "you");
   $("resume-status").textContent = ""; $("resume-file").value = "";
   const res = await api("/profile/");
-  if (res.ok) {
-    const p = (await res.json()).data || {};
-    $("resume-summary").innerHTML = `Current profile: <b>${esc(p.name || "—")}</b> · ${(p.skills || []).length} skills · ${(p.experience || []).length} roles`;
-  } else {
-    $("resume-summary").textContent = "No profile yet — upload a résumé to create one.";
-  }
+  const p = res.ok ? ((await res.json()).data || {}) : {};
+  $("resume-summary").textContent = res.ok
+    ? "Loaded your saved profile — edit and Save, or upload a PDF to re-parse."
+    : "No profile yet — upload a résumé to fill these fields.";
+  renderProfile(p);
   $("resume-overlay").classList.add("show");
 }
 function closeResume() { $("resume-overlay").classList.remove("show"); }
+
 async function parseResume() {
   const file = $("resume-file").files[0];
   if (!file) { $("resume-status").textContent = "choose a PDF first"; return; }
@@ -306,7 +429,18 @@ async function parseResume() {
   const res = await api("/resume/parse", { method: "POST", body: fd });
   if (!res.ok) { $("resume-status").textContent = "parse failed (" + res.status + ")"; return; }
   const p = (await res.json()).data || {};
-  $("resume-summary").innerHTML = `Saved: <b>${esc(p.name || "—")}</b> · ${(p.skills || []).length} skills`;
+  renderProfile(p);
+  $("resume-summary").textContent = "Parsed from PDF — review the fields and click Save profile.";
+  $("resume-status").textContent = "parsed ✓";
+}
+
+async function saveProfile() {
+  const data = collectProfile();
+  $("resume-status").textContent = "saving…";
+  const res = await api("/profile/", {
+    method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
+  });
+  if (!res.ok) { $("resume-status").textContent = "save failed (" + res.status + ")"; return; }
   $("resume-status").textContent = "saved ✓";
 }
 
