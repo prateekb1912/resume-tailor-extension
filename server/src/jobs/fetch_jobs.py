@@ -9,6 +9,7 @@ button. The interactive /jobs/refresh calls fetch_jobs(include_linkedin=False).
 """
 
 import logging
+import os
 
 from src.config.database import SessionLocal
 from src.services import matching_service, scraper_service
@@ -18,10 +19,13 @@ logger = logging.getLogger(__name__)
 
 
 def main() -> None:
+    # LinkedIn/Apify is rate-limited to once a day — the daily schedule sets INCLUDE_LINKEDIN;
+    # the every-6h runs leave it unset and just refresh the free board sources.
+    include_linkedin = os.getenv("INCLUDE_LINKEDIN", "").lower() in ("1", "true", "yes")
     db = SessionLocal()
     try:
         seeded = scraper_service.seed_companies(db)
-        new_jobs = scraper_service.fetch_jobs(db, include_linkedin=True)
+        new_jobs = scraper_service.fetch_jobs(db, include_linkedin=include_linkedin)
         logger.info("seeded %s companies; fetched %s new jobs", seeded, new_jobs)
         matched = matching_service.match_active_profiles(db)
         logger.info(
