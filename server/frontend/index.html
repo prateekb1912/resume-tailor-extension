@@ -133,6 +133,7 @@
   <button onclick="load()">Apply</button>
   <button class="primary" onclick="matchForMe()">🎯 Match for me</button>
   <button onclick="refresh()">↻ Fetch</button>
+  <button id="linkedin-refresh" onclick="refreshLinkedIn()">LinkedIn (1/day)</button>
   <button onclick="openResume()">📄 Resume</button>
   <button onclick="openPrefs()">⚙ Preferences</button>
   <span id="status" style="color:var(--muted);font-size:12px;"></span>
@@ -209,6 +210,9 @@ const setStatus = m => document.getElementById("status").textContent = m;
 const csv = s => s.split(",").map(x => x.trim()).filter(Boolean);
 const joinCsv = a => (a || []).join(", ");
 const $ = id => document.getElementById(id);
+const errorDetail = (body, fallback) => typeof body?.detail === "string"
+  ? body.detail
+  : (body?.detail?.message || fallback);
 const esc = s => (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const scoreColor = s => s >= 75 ? "#e4f7ec;color:#2f9e44" : s >= 60 ? "#fdf1dc;color:#b0812a" : "#fde8ec;color:#d6336c";
 let dragId = null;
@@ -315,7 +319,7 @@ async function boot() {
     const me = await api("/auth/me");
     if (!me.ok) return logout("Please sign in again.");
     showApp((await me.json()).email || "");
-    await load();
+    await Promise.all([load(), loadLinkedInStatus()]);
   } catch {
     if (token) showAuth("Could not load your dashboard. Please try again.", true);
   }
@@ -386,6 +390,38 @@ async function refresh() {
   setStatus("fetching…");
   const r = await (await api("/jobs/refresh", { method:"POST" })).json();
   setStatus(`+${r.new_jobs} new jobs`); load();
+}
+function setLinkedInButton(allowed, nextReset = null) {
+  const button = $("linkedin-refresh");
+  button.disabled = !allowed;
+  button.textContent = allowed ? "LinkedIn (1/day)" : "LinkedIn used today";
+  button.title = nextReset ? "Available again at " + new Date(nextReset).toLocaleString() : "";
+}
+async function loadLinkedInStatus() {
+  const res = await api("/jobs/refresh/linkedin");
+  if (!res.ok) return;
+  const quota = await res.json();
+  setLinkedInButton(quota.allowed, quota.next_reset_at);
+}
+async function refreshLinkedIn() {
+  const button = $("linkedin-refresh");
+  button.disabled = true;
+  setStatus("fetching LinkedIn jobs…");
+  try {
+    const res = await api("/jobs/refresh/linkedin", { method:"POST" });
+    const body = await res.json().catch(() => ({}));
+    if (!res.ok) {
+      setStatus(errorDetail(body, "LinkedIn refresh failed (" + res.status + ")"));
+      if (res.status === 429) setLinkedInButton(false, body.detail?.next_reset_at);
+      else button.disabled = false;
+      return;
+    }
+    setLinkedInButton(false, body.next_reset_at);
+    setStatus(`LinkedIn: +${body.new_jobs} new jobs — click Match for me to score them`);
+  } catch {
+    button.disabled = false;
+    setStatus("LinkedIn refresh failed — try again");
+  }
 }
 async function matchForMe() {
   setStatus("screening against your preferences…");

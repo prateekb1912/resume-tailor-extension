@@ -4,8 +4,9 @@ every onboarded profile so boards fill without anyone clicking Match.
 Run locally:   pipenv run python -m src.jobs.fetch_jobs
 On Render:     a Cron Job service with this as its command.
 
-This is the ONLY place include_linkedin=True is used — Apify runs on schedule, never on a
-button. The interactive /jobs/refresh calls fetch_jobs(include_linkedin=False).
+This is the ONLY place include_linkedin=True is used. The ordinary /jobs/refresh remains
+free-source-only; the separate authenticated /jobs/refresh/linkedin endpoint runs only
+LinkedIn and enforces one manual Apify trigger per account per UTC day.
 """
 
 import logging

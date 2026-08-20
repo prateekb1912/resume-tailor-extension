@@ -143,11 +143,10 @@ def _linkedin_titles(db: Session) -> list[str]:
     return titles[: settings.apify_max_titles]
 
 
-def _linkedin_items(db: Session) -> list[dict[str, Any]]:
-    if not settings.apify_token:
+def _linkedin_items(titles: list[str]) -> list[dict[str, Any]]:
+    if not settings.apify_token.strip():
         logger.warning("APIFY_TOKEN not set — skipping LinkedIn")
         return []
-    titles = _linkedin_titles(db)
     if not titles:
         logger.info("no user preference titles configured — skipping LinkedIn")
         return []
@@ -155,7 +154,7 @@ def _linkedin_items(db: Session) -> list[dict[str, Any]]:
         return linkedin_apify.fetch_jobs(
             titles,
             settings.apify_location,
-            settings.apify_token,
+            settings.apify_token.strip(),
             settings.apify_actor_id,
             settings.apify_count,
         )
@@ -166,7 +165,8 @@ def _linkedin_items(db: Session) -> list[dict[str, Any]]:
 
 def fetch_jobs(db: Session, include_linkedin: bool = False) -> int:
     """Fetch + store new jobs. Free board sources always run; include_linkedin=True is
-    CRON ONLY (consumes Apify quota) — the manual /jobs/refresh must pass False."""
+    used by the scheduled global refresh. Manual per-account LinkedIn refreshes use
+    fetch_linkedin_jobs() so they only search that account's configured titles."""
     seen: set[str] = {key for (key,) in db.query(Job.dedup_key).all()}
     new_count = 0
     # Free board sources (curated company lists).
@@ -175,5 +175,11 @@ def fetch_jobs(db: Session, include_linkedin: bool = False) -> int:
     # Free feed source (auto-discovery — any company hiring on Workable in a user's location).
     new_count += _store(db, _workable_items(db), seen)
     if include_linkedin:
-        new_count += _store(db, _linkedin_items(db), seen)
+        new_count += _store(db, _linkedin_items(_linkedin_titles(db)), seen)
     return new_count
+
+
+def fetch_linkedin_jobs(db: Session, titles: list[str]) -> int:
+    """Run the paid LinkedIn/Apify source only, scoped to one account's titles."""
+    seen: set[str] = {key for (key,) in db.query(Job.dedup_key).all()}
+    return _store(db, _linkedin_items(titles[: settings.apify_max_titles]), seen)
