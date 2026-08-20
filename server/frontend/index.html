@@ -19,6 +19,22 @@
   button:hover { background:#f3f4f6; }
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
   button.primary:hover { filter:brightness(1.05); }
+  .hidden { display:none !important; }
+
+  #auth-page { min-height:100vh; display:grid; place-items:center; padding:28px 16px; background:linear-gradient(145deg,#f8faff 0%,#eef2ff 100%); }
+  .auth-shell { width:100%; max-width:410px; }
+  .auth-brand { text-align:center; margin-bottom:20px; }
+  .auth-logo { width:52px; height:52px; margin:0 auto 12px; border-radius:15px; display:grid; place-items:center; background:var(--accent); color:#fff; font-size:26px; font-weight:800; box-shadow:0 8px 24px rgba(79,70,229,.22); }
+  .auth-brand h1 { margin:0; font-size:24px; }
+  .auth-brand p { margin:6px 0 0; color:var(--muted); font-size:13px; line-height:1.5; }
+  .auth-card { padding:24px; border:1px solid var(--line); border-radius:16px; background:#fff; box-shadow:0 14px 38px rgba(16,24,40,.10); }
+  .auth-card h2 { margin:0 0 4px; font-size:18px; }
+  .auth-card .sub { margin-bottom:18px; color:var(--muted); font-size:12px; }
+  .auth-card .fld input { width:100%; padding:10px 11px; }
+  .auth-status { min-height:18px; margin:2px 0 10px; color:var(--muted); font-size:12px; }
+  .auth-status.error { color:#dc2626; }
+  .auth-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
+  .auth-actions button { padding:9px 10px; }
 
   #board { display:flex; gap:10px; padding:14px 16px; align-items:flex-start; }
   .col { flex:1 1 0; min-width:0; background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 8px 10px; box-shadow:var(--shadow); }
@@ -73,6 +89,8 @@
     .col-body { max-height:calc(100vh - 190px); }
     .modal, .modal.wide { width:100%; padding:16px; }
     .row2 { flex-direction:column; gap:0; }
+    .auth-card { padding:20px; }
+    .auth-actions { grid-template-columns:1fr; }
   }
   .sec { margin-top:18px; }
   .sec > .sec-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
@@ -84,6 +102,31 @@
 </style>
 </head>
 <body>
+
+<main id="auth-page">
+  <div class="auth-shell">
+    <div class="auth-brand">
+      <div class="auth-logo">T</div>
+      <h1>Welcome to Tailr</h1>
+      <p>Sign in to access your job dashboard, résumé and preferences.</p>
+    </div>
+    <div class="auth-card">
+      <h2 id="auth-title">Sign in to your account</h2>
+      <div class="sub" id="auth-sub">Your Tailr workspace is private to your account.</div>
+      <form id="auth-form" onsubmit="event.preventDefault(); submitAuth();">
+        <div class="fld"><label>Email</label><input type="email" id="auth-email" placeholder="you@example.com" autocomplete="email" required></div>
+        <div class="fld"><label>Password</label><input type="password" id="auth-password" placeholder="at least 8 characters" autocomplete="current-password" minlength="8" maxlength="128" required></div>
+        <div class="auth-status" id="auth-status"></div>
+        <div class="auth-actions">
+          <button type="button" id="auth-toggle" onclick="toggleAuthMode()">Create account</button>
+          <button type="submit" class="primary" id="auth-submit">Sign in</button>
+        </div>
+      </form>
+    </div>
+  </div>
+</main>
+
+<div id="app-page" class="hidden">
 <header>
   <h1>Tailr</h1>
   <input id="q" placeholder="search" size="14">
@@ -105,20 +148,6 @@
   2. <b>↻ Fetch</b> to pull the latest jobs into the shared pool (optional — already populated).<br>
   3. <b>🎯 Match for me</b> to score jobs against your profile — scored cards then appear here.<br>
   <span style="font-size:12px">Low-fit jobs are auto-parked in the collapsed <b>Skipped</b> column.</span>
-</div>
-
-<div class="overlay" id="auth-overlay">
-  <div class="modal">
-    <h2 id="auth-title">Sign in to Tailr</h2>
-    <div class="sub" id="auth-sub">Your jobs, profile and preferences live behind your account.</div>
-    <div class="fld"><label>Email</label><input type="text" id="auth-email" placeholder="you@example.com"></div>
-    <div class="fld"><label>Password</label><input type="password" id="auth-password" placeholder="at least 8 characters"></div>
-    <div class="modal-actions">
-      <span id="auth-status" style="color:var(--muted);font-size:12px;margin-right:auto;"></span>
-      <button id="auth-toggle" onclick="toggleAuthMode()">Need an account? Sign up</button>
-      <button class="primary" id="auth-submit" onclick="submitAuth()">Sign in</button>
-    </div>
-  </div>
 </div>
 
 <div class="overlay" id="resume-overlay">
@@ -170,6 +199,7 @@
     </div>
   </div>
 </div>
+</div>
 
 <script>
 const COLUMNS = ["skipped","new","applied","interviewing","offer","rejected"];
@@ -194,56 +224,101 @@ async function api(path, opts = {}) {
   const headers = { ...(opts.headers || {}) };
   if (token) headers["Authorization"] = "Bearer " + token;
   const res = await fetch(path, { ...opts, headers });
-  if (res.status === 401) { logout(); throw new Error("unauthorized"); }
+  if (res.status === 401) { logout("Your session expired. Sign in again."); throw new Error("unauthorized"); }
   return res;
+}
+
+function setAuthStatus(message, error = false) {
+  $("auth-status").textContent = message;
+  $("auth-status").classList.toggle("error", error);
+}
+
+function renderAuthMode() {
+  const login = authMode === "login";
+  $("auth-title").textContent = login ? "Sign in to your account" : "Create your Tailr account";
+  $("auth-sub").textContent = login
+    ? "Your Tailr workspace is private to your account."
+    : "Create an account to save your résumé, preferences and matched jobs.";
+  $("auth-submit").textContent = login ? "Sign in" : "Sign up";
+  $("auth-toggle").textContent = login ? "Create account" : "Back to sign in";
+  $("auth-password").autocomplete = login ? "current-password" : "new-password";
+  setAuthStatus("");
 }
 
 function toggleAuthMode() {
   authMode = authMode === "login" ? "register" : "login";
-  const login = authMode === "login";
-  $("auth-title").textContent = login ? "Sign in to Tailr" : "Create your Tailr account";
-  $("auth-submit").textContent = login ? "Sign in" : "Sign up";
-  $("auth-toggle").textContent = login ? "Need an account? Sign up" : "Have an account? Sign in";
-  $("auth-status").textContent = "";
+  renderAuthMode();
+}
+
+function showAuth(message = "", error = false) {
+  $("app-page").classList.add("hidden");
+  $("auth-page").classList.remove("hidden");
+  setAuthStatus(message, error);
+}
+
+function showApp(email) {
+  $("whoami").textContent = email || "";
+  $("auth-page").classList.add("hidden");
+  $("app-page").classList.remove("hidden");
 }
 
 async function submitAuth() {
   const email = $("auth-email").value.trim();
   const password = $("auth-password").value;
-  if (!email || !password) { $("auth-status").textContent = "email and password required"; return; }
-  $("auth-status").textContent = "…";
-  const res = await fetch("/auth/" + (authMode === "login" ? "login" : "register"), {
-    method: "POST", headers: { "Content-Type": "application/json" },
-    body: JSON.stringify({ email, password }),
-  });
-  if (!res.ok) {
-    const msg = (await res.json().catch(() => ({}))).detail || ("failed (" + res.status + ")");
-    $("auth-status").textContent = typeof msg === "string" ? msg : "failed";
-    return;
+  if (!email || !password) { setAuthStatus("Email and password are required.", true); return; }
+  if (password.length < 8) { setAuthStatus("Password must be at least 8 characters.", true); return; }
+
+  $("auth-submit").disabled = true;
+  $("auth-toggle").disabled = true;
+  setAuthStatus(authMode === "login" ? "Signing in…" : "Creating your account…");
+
+  try {
+    const res = await fetch("/auth/" + (authMode === "login" ? "login" : "register"), {
+      method: "POST", headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!res.ok) {
+      const msg = (await res.json().catch(() => ({}))).detail || ("Failed (" + res.status + ")");
+      setAuthStatus(typeof msg === "string" ? msg : "Authentication failed.", true);
+      return;
+    }
+    token = (await res.json()).access_token;
+    localStorage.setItem(TOKEN_KEY, token);
+    $("auth-password").value = "";
+    setAuthStatus("Opening your dashboard…");
+    await boot();
+  } catch {
+    setAuthStatus("Could not connect to Tailr. Please try again.", true);
+  } finally {
+    $("auth-submit").disabled = false;
+    $("auth-toggle").disabled = false;
   }
-  token = (await res.json()).access_token;
-  localStorage.setItem(TOKEN_KEY, token);
-  $("auth-overlay").classList.remove("show");
-  $("auth-password").value = "";
-  boot();
 }
 
-function logout() {
+function logout(message = "") {
   token = "";
   localStorage.removeItem(TOKEN_KEY);
   $("whoami").textContent = "";
   $("board").innerHTML = "";
-  $("auth-overlay").classList.add("show");
+  $("empty").style.display = "none";
+  $("resume-overlay").classList.remove("show");
+  $("prefs-overlay").classList.remove("show");
+  authMode = "login";
+  renderAuthMode();
+  showAuth(message, !!message);
 }
 
 async function boot() {
-  if (!token) { $("auth-overlay").classList.add("show"); return; }
+  if (!token) { showAuth(); return; }
+  showAuth("Checking your session…");
   try {
     const me = await api("/auth/me");
-    if (!me.ok) return logout();
-    $("whoami").textContent = (await me.json()).email || "";
-    load();
-  } catch { /* logout already fired on 401 */ }
+    if (!me.ok) return logout("Please sign in again.");
+    showApp((await me.json()).email || "");
+    await load();
+  } catch {
+    if (token) showAuth("Could not load your dashboard. Please try again.", true);
+  }
 }
 
 async function load() {
