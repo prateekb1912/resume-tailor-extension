@@ -1,16 +1,19 @@
-const DEFAULT_SERVER = 'http://localhost:8000';
+const DEFAULT_SERVER = 'https://tailr-api.onrender.com';
 const STORAGE_KEY_PROFILE = 'resumeProfile';
 const STORAGE_KEY_SERVER = 'serverUrl';
 const STORAGE_KEY_EMAIL = 'userEmail';
+const STORAGE_KEY_TOKEN = 'accessToken';
 const STORAGE_KEY_PRINT = 'printProfile';
 const TIMEOUT_MS = 120_000;
 
-const parseUrl = (base) => `${(base || DEFAULT_SERVER).replace(/\/$/, '')}/resume/parse`;
-const tailorUrl = (base) => `${(base || DEFAULT_SERVER).replace(/\/$/, '')}/resume/tailor`;
+const serverUrl = (base) => (base || DEFAULT_SERVER).trim().replace(/\/+$/, '');
+const apiUrl = (base, path) => `${serverUrl(base)}${path}`;
 
 let jobData = null;
 let downloadHandler = null;
 let siteKey = null;
+let accessToken = '';
+let syncParseButton = () => {};
 
 function tailorKey() {
   return siteKey ? `tailorResult:${siteKey}` : 'tailorResult';
@@ -193,6 +196,193 @@ function extractJobInfo() {
   };
 }
 
+// ── API + account helpers ────────────────────────────────────────────────────
+
+async function apiError(response) {
+  let detail = '';
+  try {
+    const body = JSON.parse(await response.text());
+    detail = typeof body.detail === 'string'
+      ? body.detail
+      : (Array.isArray(body.detail) ? body.detail[0]?.msg : '');
+  } catch {
+    // A status-code fallback below is clearer than an HTML proxy error page.
+  }
+
+  const sessionExpired = response.status === 401 &&
+    (!detail || detail === 'Could not validate credentials');
+  const error = new Error(
+    sessionExpired
+      ? 'Your session expired. Sign in again.'
+      : (detail || `Server returned ${response.status}`),
+  );
+  error.status = response.status;
+  return error;
+}
+
+async function timedFetch(url, options = {}) {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
+  try {
+    return await fetch(url, { ...options, signal: controller.signal });
+  } finally {
+    clearTimeout(timer);
+  }
+}
+
+function setAuthStatus(msg, type = '') {
+  const el = document.getElementById('auth-status');
+  el.textContent = msg;
+  el.className = `auth-status ${type}`;
+}
+
+function setAuthBusy(busy, mode = 'login') {
+  const loginBtn = document.getElementById('login-btn');
+  const registerBtn = document.getElementById('register-btn');
+  loginBtn.disabled = busy;
+  registerBtn.disabled = busy;
+  loginBtn.textContent = busy && mode === 'login' ? 'Signing in…' : 'Sign in';
+  registerBtn.textContent = busy && mode === 'register' ? 'Creating…' : 'Create account';
+}
+
+function renderAccount(email = '') {
+  const signedIn = !!accessToken;
+  document.getElementById('auth-form').style.display = signedIn ? 'none' : '';
+  document.getElementById('account-session').classList.toggle('visible', signedIn);
+
+  if (signedIn) {
+    const label = email || document.getElementById('user-email').value.trim();
+    document.getElementById('account-email').textContent = label;
+    document.getElementById('account-badge').textContent = (label[0] || 'T').toUpperCase();
+  }
+}
+
+function profileHasContent(profile) {
+  return !!(
+    profile?.name || profile?.summary || profile?.phone || profile?.location ||
+    profile?.experience?.length || profile?.education?.length ||
+    profile?.skills?.length || profile?.projects?.length
+  );
+}
+
+function unwrapProfile(envelope, fallbackEmail = '') {
+  return {
+    ...(envelope?.data || {}),
+    email: envelope?.email || envelope?.data?.email || fallbackEmail,
+  };
+}
+
+async function loadRemoteProfile(base, token, email) {
+  const response = await timedFetch(apiUrl(base, '/auth/me'), {
+    headers: { 'Authorization': `Bearer ${token}` },
+  });
+  if (!response.ok) throw await apiError(response);
+
+  const profile = unwrapProfile(await response.json(), email);
+  if (profileHasContent(profile)) {
+    await chrome.storage.local.set({ [STORAGE_KEY_PROFILE]: profile });
+    showLoadedState(profile);
+  } else {
+    await chrome.storage.local.remove(STORAGE_KEY_PROFILE);
+    showEmptyState();
+  }
+}
+
+async function clearSession(message = '') {
+  const stored = await chrome.storage.local.get(null);
+  const resultKeys = Object.keys(stored).filter((key) => key.startsWith('tailorResult'));
+  await chrome.storage.local.remove([
+    STORAGE_KEY_TOKEN,
+    STORAGE_KEY_PROFILE,
+    STORAGE_KEY_PRINT,
+    ...resultKeys,
+  ]);
+
+  accessToken = '';
+  showEmptyState();
+  renderFit(null);
+  document.getElementById('download-btn').classList.remove('visible');
+  document.getElementById('tailor-btn').classList.remove('loading');
+  document.getElementById('tailor-btn').textContent = 'Tailor Resume';
+  renderAccount();
+  setAuthStatus(message, message ? 'error' : '');
+  syncParseButton();
+  maybeEnableTailorBtn();
+}
+
+async function authenticate(mode) {
+  const emailInput = document.getElementById('user-email');
+  const passwordInput = document.getElementById('user-password');
+  const serverInput = document.getElementById('server-url');
+  const email = emailInput.value.trim().toLowerCase();
+  const password = passwordInput.value;
+
+  if (!email || !emailInput.checkValidity()) {
+    setAuthStatus('Enter a valid email address.', 'error');
+    return;
+  }
+  if (password.length < 8) {
+    setAuthStatus('Password must be at least 8 characters.', 'error');
+    return;
+  }
+
+  let base;
+  try {
+    const parsed = new URL(serverUrl(serverInput.value));
+    if (!['http:', 'https:'].includes(parsed.protocol)) throw new Error();
+    base = serverUrl(parsed.href);
+  } catch {
+    setAuthStatus('Enter a valid API URL in Connection settings.', 'error');
+    return;
+  }
+
+  setAuthBusy(true, mode);
+  setAuthStatus(mode === 'register' ? 'Creating your account…' : 'Signing in…');
+
+  try {
+    const response = await timedFetch(apiUrl(base, `/auth/${mode}`), {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email, password }),
+    });
+    if (!response.ok) throw await apiError(response);
+
+    const auth = await response.json();
+    if (!auth.access_token) throw new Error('The API did not return an access token.');
+
+    accessToken = auth.access_token;
+    passwordInput.value = '';
+    await chrome.storage.local.set({
+      [STORAGE_KEY_TOKEN]: accessToken,
+      [STORAGE_KEY_EMAIL]: email,
+      [STORAGE_KEY_SERVER]: base,
+    });
+    serverInput.value = base;
+    serverInput.dataset.current = base;
+    renderAccount(email);
+    syncParseButton();
+
+    try {
+      await loadRemoteProfile(base, accessToken, email);
+    } catch (error) {
+      if (error.status === 401) {
+        await clearSession(error.message);
+        return;
+      }
+      setTailorStatus(`Signed in, but the saved résumé could not be loaded: ${error.message}`, 'error');
+    }
+
+    maybeEnableTailorBtn();
+  } catch (error) {
+    const msg = error.name === 'AbortError'
+      ? 'The API took too long to respond. Try again once it wakes up.'
+      : error.message;
+    setAuthStatus(msg, 'error');
+  } finally {
+    setAuthBusy(false);
+  }
+}
+
 // ── Helpers ───────────────────────────────────────────────────────────────────
 
 // Keep the char-count label in sync with whatever's in the editable JD field.
@@ -268,30 +458,20 @@ function showEmptyState() {
 
 // ── Parse resume (one-time) ───────────────────────────────────────────────────
 
-async function parseAndSave(file, email, serverBase) {
+async function parseAndSave(file, serverBase, token, email) {
   const form = new FormData();
   form.append('resume', file, file.name);
-  form.append('email', email);
 
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), TIMEOUT_MS);
-
-  const response = await fetch(parseUrl(serverBase), {
+  const response = await timedFetch(apiUrl(serverBase, '/resume/parse'), {
     method: 'POST',
-    signal: controller.signal,
+    headers: { 'Authorization': `Bearer ${token}` },
     body: form,
   });
-  clearTimeout(timer);
-
-  if (!response.ok) {
-    const body = await response.text().catch(() => '');
-    throw new Error(`Server returned ${response.status}${body ? ': ' + body.slice(0, 120) : ''}`);
-  }
+  if (!response.ok) throw await apiError(response);
 
   // Server wraps the profile as { data, name, email } — unwrap to the flat
   // profile the rest of the popup (and the PDF builder) expects.
-  const envelope = await response.json();
-  const profile = { ...envelope.data, email: envelope.email || email };
+  const profile = unwrapProfile(await response.json(), email);
 
   await chrome.storage.local.set({
     [STORAGE_KEY_PROFILE]: { ...profile, _parsedAt: new Date().toISOString() },
@@ -303,7 +483,7 @@ async function parseAndSave(file, email, serverBase) {
 // ── Init ──────────────────────────────────────────────────────────────────────
 
 async function init() {
-  // File picker + account fields
+  // Account + file fields
   const filePickBtn = document.getElementById('file-pick-btn');
   const fileInput = document.getElementById('resume-file');
   const fileNameEl = document.getElementById('file-name');
@@ -311,10 +491,16 @@ async function init() {
   const emailInput = document.getElementById('user-email');
   const serverInput = document.getElementById('server-url');
 
-  // Parsing needs both a file and an email — the server keys the profile on email.
-  const syncParseBtn = () => {
-    parseBtn.disabled = !(fileInput.files[0] && emailInput.value.trim());
+  syncParseButton = () => {
+    parseBtn.disabled = !(fileInput.files[0] && accessToken);
   };
+
+  document.getElementById('auth-form').addEventListener('submit', (event) => {
+    event.preventDefault();
+    authenticate('login');
+  });
+  document.getElementById('register-btn').addEventListener('click', () => authenticate('register'));
+  document.getElementById('logout-btn').addEventListener('click', () => clearSession());
 
   filePickBtn.addEventListener('click', () => fileInput.click());
 
@@ -324,29 +510,31 @@ async function init() {
       fileNameEl.textContent = file.name;
       fileNameEl.className = 'file-name selected';
     }
-    syncParseBtn();
+    syncParseButton();
   });
 
   parseBtn.addEventListener('click', async () => {
     const file = fileInput.files[0];
     const email = emailInput.value.trim();
-    const serverBase = serverInput.value.trim() || DEFAULT_SERVER;
-    if (!file || !email) return;
+    const serverBase = serverUrl(serverInput.value);
+    if (!file || !accessToken) return;
 
     parseBtn.disabled = true;
     parseBtn.textContent = 'Parsing…';
     setParseStatus('Parsing resume…');
 
     try {
-      const profile = await parseAndSave(file, email, serverBase);
+      const profile = await parseAndSave(file, serverBase, accessToken, email);
       setParseStatus('Saved!', 'success');
       showLoadedState(profile);
       maybeEnableTailorBtn();
     } catch (err) {
-      const msg = err.name === 'AbortError' ? 'Timed out.' : err.message;
+      const msg = err.name === 'AbortError' ? 'The API took too long to respond.' : err.message;
       setParseStatus(`Error: ${msg}`, 'error');
-      parseBtn.disabled = false;
+      if (err.status === 401) await clearSession(err.message);
+    } finally {
       parseBtn.textContent = 'Parse & Save Resume';
+      syncParseButton();
     }
   });
 
@@ -376,23 +564,43 @@ async function init() {
     ensureJobData().company = e.target.value.trim();
   });
 
-  // Load stored server URL + email
-  const stored = await chrome.storage.local.get([STORAGE_KEY_SERVER, STORAGE_KEY_EMAIL, STORAGE_KEY_PROFILE]);
-  serverInput.value = stored[STORAGE_KEY_SERVER] || DEFAULT_SERVER;
-  serverInput.addEventListener('change', (e) => {
-    chrome.storage.local.set({ [STORAGE_KEY_SERVER]: e.target.value.trim() });
+  // Load the persisted account. The token is never bundled into the ZIP; every
+  // person signs in and receives their own token from the deployed API.
+  const stored = await chrome.storage.local.get([
+    STORAGE_KEY_SERVER,
+    STORAGE_KEY_EMAIL,
+    STORAGE_KEY_TOKEN,
+    STORAGE_KEY_PROFILE,
+  ]);
+  const currentServer = serverUrl(stored[STORAGE_KEY_SERVER] || DEFAULT_SERVER);
+  serverInput.value = currentServer;
+  serverInput.dataset.current = currentServer;
+  serverInput.addEventListener('change', async (e) => {
+    const previous = e.target.dataset.current || DEFAULT_SERVER;
+    const next = serverUrl(e.target.value);
+    e.target.value = next;
+    e.target.dataset.current = next;
+    await chrome.storage.local.set({ [STORAGE_KEY_SERVER]: next });
+    if (accessToken && next !== previous) {
+      await clearSession('API changed. Sign in again.');
+    }
   });
 
   emailInput.value = stored[STORAGE_KEY_EMAIL] || stored[STORAGE_KEY_PROFILE]?.email || '';
   emailInput.addEventListener('input', () => {
     chrome.storage.local.set({ [STORAGE_KEY_EMAIL]: emailInput.value.trim() });
-    syncParseBtn();
   });
-  syncParseBtn();
 
-  // Show stored profile if it exists
-  if (stored[STORAGE_KEY_PROFILE]) {
+  accessToken = stored[STORAGE_KEY_TOKEN] || '';
+  renderAccount(emailInput.value.trim());
+  syncParseButton();
+
+  // A locally cached profile is account-scoped, so never display it while
+  // signed out (important on shared computers).
+  if (accessToken && stored[STORAGE_KEY_PROFILE]) {
     showLoadedState(stored[STORAGE_KEY_PROFILE]);
+  } else if (!accessToken && stored[STORAGE_KEY_PROFILE]) {
+    await chrome.storage.local.remove(STORAGE_KEY_PROFILE);
   }
 
   // Extract JD from active tab
@@ -422,37 +630,47 @@ async function init() {
   maybeEnableTailorBtn();
 }
 
-function maybeEnableTailorBtn() {
-  chrome.storage.local.get([STORAGE_KEY_PROFILE, tailorKey()], (stored) => {
-    const hasProfile = !!stored[STORAGE_KEY_PROFILE];
-    const hasJD = jobData && jobData.description.length >= 100;
-    const tr = stored[tailorKey()];
+async function maybeEnableTailorBtn() {
+  const key = tailorKey();
+  const stored = await chrome.storage.local.get([STORAGE_KEY_PROFILE, STORAGE_KEY_TOKEN, key]);
+  const hasProfile = !!stored[STORAGE_KEY_PROFILE];
+  const signedIn = !!stored[STORAGE_KEY_TOKEN];
+  const hasJD = jobData && jobData.description.length >= 100;
+  const tr = stored[key];
 
-    // Treat pending as stale if it's been running for over 3 minutes
-    const isStuckPending = tr?.status === 'pending' &&
-      tr.startedAt && (Date.now() - tr.startedAt) > 180_000;
+  if (tr?.authRequired) {
+    const message = tr.error || 'Your session expired. Sign in again.';
+    await clearSession(message);
+    setTailorStatus(message, 'error');
+    return;
+  }
 
-    if (isStuckPending) {
-      chrome.storage.local.remove(tailorKey());
-    }
+  // Treat pending as stale if it has been running for over 3 minutes.
+  const isStuckPending = tr?.status === 'pending' &&
+    tr.startedAt && (Date.now() - tr.startedAt) > 180_000;
+  if (isStuckPending) await chrome.storage.local.remove(key);
 
-    const pending = tr?.status === 'pending' && !isStuckPending;
-    const btn = document.getElementById('tailor-btn');
-    btn.disabled = !(hasProfile && hasJD) || pending;
+  const pending = tr?.status === 'pending' && !isStuckPending;
+  const btn = document.getElementById('tailor-btn');
+  btn.disabled = !(signedIn && hasProfile && hasJD) || pending;
+  if (!pending) btn.classList.remove('loading');
 
-    if (pending) {
-      btn.classList.add('loading');
-      setTailorStatus('Processing in background…');
-    } else if (tr?.status === 'done') {
-      applyResult(tr.result);
-    } else if (tr?.status === 'error') {
-      setTailorStatus(`Error: ${tr.error}`, 'error');
-      btn.textContent = 'Retry';
-      chrome.storage.local.remove(tailorKey());
-    } else if (hasProfile && hasJD) {
-      setTailorStatus('Ready to tailor.');
-    }
-  });
+  if (pending) {
+    btn.classList.add('loading');
+    setTailorStatus('Processing in background…');
+  } else if (tr?.status === 'done') {
+    applyResult(tr.result);
+  } else if (tr?.status === 'error') {
+    setTailorStatus(`Error: ${tr.error}`, 'error');
+    btn.textContent = 'Retry';
+    await chrome.storage.local.remove(key);
+  } else if (!signedIn) {
+    setTailorStatus('Sign in to upload and tailor your résumé.');
+  } else if (!hasProfile) {
+    setTailorStatus('Upload your résumé to get started.');
+  } else if (hasJD) {
+    setTailorStatus('Ready to tailor.');
+  }
 }
 
 function applyResult(result) {
@@ -500,22 +718,20 @@ function applyResult(result) {
 document.getElementById('tailor-btn').addEventListener('click', async () => {
   if (!jobData) return;
 
-  const stored = await chrome.storage.local.get(STORAGE_KEY_PROFILE);
+  const stored = await chrome.storage.local.get([STORAGE_KEY_PROFILE, STORAGE_KEY_TOKEN]);
   const profile = stored[STORAGE_KEY_PROFILE];
+  if (!stored[STORAGE_KEY_TOKEN]) {
+    await clearSession('Sign in to Tailr first.');
+    return;
+  }
   if (!profile) {
     setTailorStatus('No resume profile found. Parse your resume first.', 'error');
     return;
   }
 
-  const email = document.getElementById('user-email').value.trim() || profile.email;
-  if (!email) {
-    setTailorStatus('Enter your email first.', 'error');
-    return;
-  }
-
   const btn = document.getElementById('tailor-btn');
   const dlBtn = document.getElementById('download-btn');
-  const serverBase = document.getElementById('server-url').value.trim() || DEFAULT_SERVER;
+  const serverBase = serverUrl(document.getElementById('server-url').value);
 
   btn.disabled = true;
   btn.classList.add('loading');
@@ -525,10 +741,9 @@ document.getElementById('tailor-btn').addEventListener('click', async () => {
 
   chrome.runtime.sendMessage({
     action: 'startTailor',
-    url: tailorUrl(serverBase),
+    url: apiUrl(serverBase, '/resume/tailor'),
     resultKey: tailorKey(),
     body: {
-      email,
       job_title: jobData.title,
       company: jobData.company,
       job_description: jobData.description,
@@ -545,11 +760,15 @@ document.getElementById('tailor-btn').addEventListener('click', async () => {
       applyResult(s[key].result);
     } else if (s[key]?.status === 'error') {
       clearInterval(poll);
-      setTailorStatus(`Error: ${s[key].error}`, 'error');
+      const result = s[key];
+      if (result.authRequired) {
+        await clearSession(result.error);
+      }
+      setTailorStatus(`Error: ${result.error}`, 'error');
       btn.classList.remove('loading');
       btn.textContent = 'Retry';
-      btn.disabled = false;
-      chrome.storage.local.remove(key);
+      btn.disabled = !!result.authRequired;
+      await chrome.storage.local.remove(key);
     }
   }, 3000);
 });

@@ -57,6 +57,132 @@
       margin-bottom: 6px;
     }
 
+    /* ── Account ── */
+    .account-card {
+      border: 1px solid #dbeafe;
+      border-radius: 8px;
+      padding: 10px 12px;
+      background: #f8fbff;
+    }
+
+    .auth-form {
+      display: flex;
+      flex-direction: column;
+      gap: 7px;
+    }
+
+    .auth-input {
+      width: 100%;
+      font: inherit;
+      font-size: 12px;
+      padding: 7px 9px;
+      border: 1px solid #d1d5db;
+      border-radius: 6px;
+      color: #111827;
+      outline: none;
+      background: #fff;
+    }
+
+    .auth-input:focus {
+      border-color: #3b82f6;
+      box-shadow: 0 0 0 2px #dbeafe;
+    }
+
+    .auth-actions {
+      display: grid;
+      grid-template-columns: 1fr 1fr;
+      gap: 7px;
+    }
+
+    .auth-btn {
+      padding: 7px;
+      border-radius: 6px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+    }
+
+    .auth-btn:disabled {
+      opacity: 0.55;
+      cursor: wait;
+    }
+
+    .auth-login {
+      border: none;
+      color: #fff;
+      background: #1e40af;
+    }
+
+    .auth-register {
+      border: 1px solid #bfdbfe;
+      color: #1e40af;
+      background: #fff;
+    }
+
+    .auth-status {
+      min-height: 14px;
+      font-size: 11px;
+      color: #6b7280;
+    }
+
+    .auth-status.error {
+      color: #dc2626;
+    }
+
+    .account-session {
+      display: none;
+      align-items: center;
+      gap: 9px;
+    }
+
+    .account-session.visible {
+      display: flex;
+    }
+
+    .account-badge {
+      width: 26px;
+      height: 26px;
+      border-radius: 50%;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #1e40af;
+      background: #dbeafe;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .account-copy {
+      flex: 1;
+      min-width: 0;
+    }
+
+    .account-email {
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+      font-size: 12px;
+      font-weight: 600;
+      color: #111827;
+    }
+
+    .account-note {
+      margin-top: 1px;
+      color: #16a34a;
+      font-size: 10px;
+    }
+
+    .sign-out {
+      border: none;
+      padding: 0;
+      color: #6b7280;
+      background: transparent;
+      font-size: 11px;
+      text-decoration: underline;
+      cursor: pointer;
+      flex-shrink: 0;
+    }
+
     /* ── Resume card ── */
     .resume-card {
       border: 1px solid #e5e7eb;
@@ -341,6 +467,17 @@
       border-color: #3b82f6;
     }
 
+    .api-settings summary {
+      color: #9ca3af;
+      font-size: 10px;
+      cursor: pointer;
+      user-select: none;
+    }
+
+    .api-settings .settings-row {
+      margin-top: 7px;
+    }
+
     /* ── Main action ── */
     .tailor-btn {
       width: 100%;
@@ -434,10 +571,31 @@
 
   <div class="body">
 
-    <!-- Account email (keys your profile on the server) -->
-    <div class="settings-row">
-      <label>Email</label>
-      <input type="email" id="user-email" placeholder="you@example.com" autocomplete="email">
+    <!-- Account -->
+    <div>
+      <div class="section-label">Account</div>
+      <div class="account-card">
+        <form class="auth-form" id="auth-form">
+          <input class="auth-input" type="email" id="user-email" placeholder="you@example.com"
+            autocomplete="email" required>
+          <input class="auth-input" type="password" id="user-password" placeholder="Password (8+ characters)"
+            autocomplete="current-password" minlength="8" maxlength="128" required>
+          <div class="auth-actions">
+            <button class="auth-btn auth-login" id="login-btn" type="submit">Sign in</button>
+            <button class="auth-btn auth-register" id="register-btn" type="button">Create account</button>
+          </div>
+          <div class="auth-status" id="auth-status"></div>
+        </form>
+
+        <div class="account-session" id="account-session">
+          <div class="account-badge" id="account-badge">T</div>
+          <div class="account-copy">
+            <div class="account-email" id="account-email"></div>
+            <div class="account-note">Connected to Tailr</div>
+          </div>
+          <button class="sign-out" id="logout-btn" type="button">Sign out</button>
+        </div>
+      </div>
     </div>
 
     <!-- Resume profile -->
@@ -494,11 +652,14 @@
 
     <hr>
 
-    <!-- Server -->
-    <div class="settings-row">
-      <label>Server</label>
-      <input type="text" id="server-url" placeholder="http://localhost:8000">
-    </div>
+    <!-- Server (normally leave this on the deployed API) -->
+    <details class="api-settings">
+      <summary>Connection settings</summary>
+      <div class="settings-row">
+        <label>API</label>
+        <input type="url" id="server-url" placeholder="https://tailr-api.onrender.com">
+      </div>
+    </details>
 
     <!-- Action -->
     <button class="tailor-btn" id="tailor-btn" disabled>Tailor Resume</button>

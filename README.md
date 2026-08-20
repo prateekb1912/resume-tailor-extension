@@ -15,3 +15,15 @@ Monorepo for the Tailr product — tailor your resume to any job description.
 
 Productionizing from a single-user local setup (extension → local n8n) into a
 multi-user hosted service. See the plan for phasing.
+
+## Share the extension
+
+Build the unpacked-extension ZIP with:
+
+```bash
+./scripts/package-extension.sh
+```
+
+The output is `dist/tailr-extension.zip`. Recipients unzip it and load the resulting folder from
+`chrome://extensions` using **Developer mode → Load unpacked**. Each recipient signs in with their
+own Tailr account; server secrets and database credentials stay on the deployed API.
