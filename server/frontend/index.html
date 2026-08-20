@@ -30,7 +30,8 @@
   .pill.offer{background:#e4f7ec;color:#2f9e44} .pill.rejected{background:#fde8ec;color:#d6336c}
   .pill.skipped{background:#fbe8d3;color:#c26a1f}
   .col-head { cursor:pointer; user-select:none; }
-  .col-body { display:flex; flex-direction:column; gap:8px; min-height:60px; padding:2px; border-radius:10px; }
+  .col-body { display:flex; flex-direction:column; gap:8px; min-height:60px; padding:2px; border-radius:10px;
+    max-height:calc(100vh - 150px); overflow-y:auto; -webkit-overflow-scrolling:touch; }
   .col-body.drop { background:#eef1fe; outline:2px dashed #c3cbf5; }
   .col.collapsed { flex:0 0 40px; }
   .col.collapsed .col-body { display:none; }
@@ -61,6 +62,18 @@
   .checks { display:flex; gap:14px; flex-wrap:wrap; font-size:13px; }
   .modal-actions { display:flex; justify-content:flex-end; gap:8px; margin-top:6px; }
   .modal.wide { width:720px; }
+
+  /* Mobile: columns become swipeable full-width lanes; forms and modals stack. */
+  @media (max-width: 720px) {
+    header { padding:10px 12px; }
+    header h1 { flex-basis:100%; }
+    #board { overflow-x:auto; gap:8px; padding:12px; -webkit-overflow-scrolling:touch; }
+    .col { flex:0 0 84%; min-width:240px; }
+    .col.collapsed { flex:0 0 40px; min-width:40px; }
+    .col-body { max-height:calc(100vh - 190px); }
+    .modal, .modal.wide { width:100%; padding:16px; }
+    .row2 { flex-direction:column; gap:0; }
+  }
   .sec { margin-top:18px; }
   .sec > .sec-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
   .sec > .sec-head h3 { margin:0; font-size:13px; text-transform:uppercase; letter-spacing:.03em; color:var(--muted); }
@@ -159,7 +172,7 @@
 </div>
 
 <script>
-const COLUMNS = ["skipped","new","saved","applied","interviewing","offer","rejected"];
+const COLUMNS = ["skipped","new","applied","interviewing","offer","rejected"];
 const collapsed = new Set(JSON.parse(localStorage.getItem("collapsed") || "[]"));
 let lastJobs = [];
 const setStatus = m => document.getElementById("status").textContent = m;
