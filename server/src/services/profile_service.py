@@ -157,9 +157,24 @@ def tailor_resume_to_job(payload: TailorResumePayload, db: Session) -> TailoredR
     profile_data = ProfileData.model_validate(profile.data)
     preferences = Preferences.model_validate(profile.preferences or {})
 
-    tailored_resume = llm.tailor_resume(
-        payload.company, payload.job_title, payload.job_description, profile_data, preferences
-    )
+    try:
+        tailored_resume = llm.tailor_resume(
+            payload.company, payload.job_title, payload.job_description, profile_data, preferences
+        )
+    except llm.LLMConfigurationError as exc:
+        raise HTTPException(
+            status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
+            detail=str(exc),
+        ) from exc
+    except Exception as exc:  # noqa: BLE001 — convert provider errors to a stable API response
+        logger.exception("resume tailoring provider failed for profile %s", profile.id)
+        raise HTTPException(
+            status_code=status.HTTP_502_BAD_GATEWAY,
+            detail=(
+                "The AI provider could not complete tailoring. Check the provider API key, "
+                "credit balance, and model access in the server deployment."
+            ),
+        ) from exc
 
     tailor_job = TailorJob(
         profile_id=profile.id,

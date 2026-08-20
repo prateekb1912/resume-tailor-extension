@@ -27,6 +27,7 @@ function storageArea(state) {
 function backgroundHarness(initialState, fetchImpl) {
   const state = { ...initialState };
   const notifications = [];
+  let messageListener;
   const context = {
     AbortController,
     clearInterval,
@@ -37,16 +38,21 @@ function backgroundHarness(initialState, fetchImpl) {
     setTimeout,
     chrome: {
       notifications: { create: (...args) => notifications.push(args) },
-      runtime: { onMessage: { addListener: () => {} } },
+      runtime: { onMessage: { addListener: (listener) => { messageListener = listener; } } },
       storage: { local: storageArea(state) },
     },
   };
   vm.runInNewContext(backgroundSource, context, { filename: 'background.js' });
-  return { context, notifications, state };
+  const sendMessage = (message) => {
+    let response;
+    messageListener(message, {}, (value) => { response = value; });
+    return response;
+  };
+  return { context, notifications, sendMessage, state };
 }
 
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', extensionDir), 'utf8'));
-assert.equal(manifest.version, '1.1.0');
+assert.equal(manifest.version, '1.1.1');
 assert(manifest.host_permissions.includes('https://tailr-api.onrender.com/*'));
 
 for (const path of [
@@ -67,14 +73,16 @@ for (const id of referencedIds) {
 }
 assert(popupSource.includes("const DEFAULT_SERVER = 'https://tailr-api.onrender.com'"));
 assert(popupSource.includes("'Authorization': `Bearer ${token}`"));
+assert(popupSource.includes("action: 'getWorkerVersion'"));
 assert(popupHtml.includes('id="auth-view"'));
 assert(popupHtml.includes('id="app-view"'));
 assert(popupHtml.includes('class="screen app-screen hidden"'));
 
 {
-  const { context, state } = backgroundHarness({}, async () => {
+  const { context, sendMessage, state } = backgroundHarness({}, async () => {
     throw new Error('fetch should not run without a token');
   });
+  assert.equal(sendMessage({ action: 'getWorkerVersion' }).version, manifest.version);
   await context.runTailor('https://tailr-api.onrender.com/resume/tailor', {}, 'missing-token');
   assert.equal(state['missing-token'].status, 'error');
   assert.equal(state['missing-token'].authRequired, true);

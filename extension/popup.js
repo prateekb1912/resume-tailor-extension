@@ -230,6 +230,15 @@ async function timedFetch(url, options = {}) {
   }
 }
 
+async function backgroundWorkerIsCurrent() {
+  try {
+    const response = await chrome.runtime.sendMessage({ action: 'getWorkerVersion' });
+    return response?.version === chrome.runtime.getManifest().version;
+  } catch {
+    return false;
+  }
+}
+
 function setAuthStatus(msg, type = '') {
   const el = document.getElementById('auth-status');
   el.textContent = msg;
@@ -719,6 +728,14 @@ function applyResult(result) {
 
 document.getElementById('tailor-btn').addEventListener('click', async () => {
   if (!jobData) return;
+
+  if (!await backgroundWorkerIsCurrent()) {
+    setTailorStatus(
+      'Extension update detected. Open chrome://extensions, click Reload on Tailr, then try again.',
+      'error',
+    );
+    return;
+  }
 
   const stored = await chrome.storage.local.get([STORAGE_KEY_PROFILE, STORAGE_KEY_TOKEN]);
   const profile = stored[STORAGE_KEY_PROFILE];

@@ -1,7 +1,12 @@
 const TIMEOUT_MS = 120_000;
 const STORAGE_KEY_TOKEN = 'accessToken';
+const WORKER_VERSION = '1.1.1';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
+  if (message.action === 'getWorkerVersion') {
+    sendResponse({ version: WORKER_VERSION });
+    return;
+  }
   if (message.action === 'startTailor') {
     sendResponse({ started: true });
     runTailor(message.url, message.body, message.resultKey || 'tailorResult');

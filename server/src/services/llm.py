@@ -1,3 +1,4 @@
+import logging
 from typing import Any
 
 from langchain.agents import create_agent
@@ -14,6 +15,12 @@ from src.schemas.profile import (
 )
 from src.config.settings import settings
 from src.config.enums import ModelNames
+
+logger = logging.getLogger(__name__)
+
+
+class LLMConfigurationError(RuntimeError):
+    """Raised when no configured provider can serve an LLM request."""
 
 _PARSE_SYSTEM_PROMPT = (
     "You are a precise resume parser. Extract the candidate's resume into the given "
@@ -140,6 +147,26 @@ def _format_preferences(preferences: Preferences) -> str:
     return "\n    ".join(lines) if lines else "- No specific preferences provided"
 
 
+def _invoke_tailor_agent(model: Any, system_prompt: str) -> TailoredResumeResult:
+    agent = create_agent(
+        model=model, system_prompt=system_prompt, response_format=TailoredResumeResult
+    )
+    response = agent.invoke(
+        {
+            "messages": [
+                {
+                    "role": "user",
+                    "content": (
+                        "Tailor the resume for the provided role and assess the candidate's "
+                        "fit. Return only the configured structured response."
+                    ),
+                }
+            ]
+        }
+    )
+    return response["structured_response"]
+
+
 def tailor_resume(
     company: str,
     job_title: str,
@@ -154,32 +181,33 @@ def tailor_resume(
         resume_profile=profile.model_dump_json(),
         preferences=_format_preferences(preferences),
     )
-    model = ChatAnthropic(
-        model_name=ModelNames.CLAUDE_SONNET_5,
-        api_key=SecretStr(settings.anthropic_api_key),
-        timeout=None,
-        stop=None,
-    )
 
-    agent = create_agent(
-        model=model, system_prompt=system_prompt, response_format=TailoredResumeResult
-    )
+    anthropic_key = settings.anthropic_api_key.strip()
+    openai_key = settings.openai_api_key.strip()
 
-    response = agent.invoke(
-        {
-            "messages": [
-                {
-                    "role": "user",
-                    "content": (
-                        "Tailor the resume for the provided role and assess the candidate's "
-                        "fit. Return only the configured structured response."
-                    ),
-                }
-            ]
-        }
-    )
+    if anthropic_key:
+        try:
+            model = ChatAnthropic(
+                model_name=ModelNames.CLAUDE_SONNET_5,
+                api_key=SecretStr(anthropic_key),
+                timeout=None,
+                stop=None,
+            )
+            return _invoke_tailor_agent(model, system_prompt)
+        except Exception:  # noqa: BLE001 — retry the configured fallback provider
+            if not openai_key:
+                raise
+            logger.exception("Anthropic tailoring failed; retrying with OpenAI")
 
-    return response["structured_response"]
+    if openai_key:
+        if not anthropic_key:
+            logger.warning("ANTHROPIC_API_KEY is not set; using OpenAI for tailoring")
+        model = ChatOpenAI(model=ModelNames.GPT_5_5, api_key=SecretStr(openai_key))
+        return _invoke_tailor_agent(model, system_prompt)
+
+    raise LLMConfigurationError(
+        "Tailoring is not configured: set ANTHROPIC_API_KEY or OPENAI_API_KEY on the server."
+    )
 
 
 # Fixed, person-agnostic screener scaffold. Everything opinionated is injected from the
