@@ -67,6 +67,9 @@ for (const id of referencedIds) {
 }
 assert(popupSource.includes("const DEFAULT_SERVER = 'https://tailr-api.onrender.com'"));
 assert(popupSource.includes("'Authorization': `Bearer ${token}`"));
+assert(popupHtml.includes('id="auth-view"'));
+assert(popupHtml.includes('id="app-view"'));
+assert(popupHtml.includes('class="screen app-screen hidden"'));
 
 {
   const { context, state } = backgroundHarness({}, async () => {

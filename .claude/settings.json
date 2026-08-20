@@ -1,0 +1,8 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(DATABASE_URL=postgresql+psycopg://u:p@localhost:5432/x pipenv run python -c ' *)",
+      "Bash(docker compose *)"
+    ]
+  }
+}

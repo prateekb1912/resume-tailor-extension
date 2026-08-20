@@ -247,6 +247,8 @@ function setAuthBusy(busy, mode = 'login') {
 
 function renderAccount(email = '') {
   const signedIn = !!accessToken;
+  document.getElementById('auth-view').classList.toggle('hidden', signedIn);
+  document.getElementById('app-view').classList.toggle('hidden', !signedIn);
   document.getElementById('auth-form').style.display = signedIn ? 'none' : '';
   document.getElementById('account-session').classList.toggle('visible', signedIn);
 

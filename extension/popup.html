@@ -42,9 +42,57 @@
 
     .body {
       padding: 14px 16px;
+    }
+
+    .screen.hidden {
+      display: none;
+    }
+
+    .auth-screen {
+      min-height: 390px;
+      display: flex;
+      flex-direction: column;
+      justify-content: center;
+      gap: 14px;
+      padding: 16px 0 24px;
+    }
+
+    .app-screen {
       display: flex;
       flex-direction: column;
       gap: 12px;
+    }
+
+    .auth-intro {
+      text-align: center;
+      padding: 0 18px;
+    }
+
+    .auth-mark {
+      width: 42px;
+      height: 42px;
+      margin: 0 auto 10px;
+      border-radius: 12px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      color: #fff;
+      background: #1e40af;
+      font-size: 22px;
+      font-weight: 700;
+    }
+
+    .auth-intro h2 {
+      color: #111827;
+      font-size: 18px;
+      line-height: 1.25;
+    }
+
+    .auth-intro p {
+      margin-top: 5px;
+      color: #6b7280;
+      font-size: 12px;
+      line-height: 1.45;
     }
 
     /* ── Section label ── */
@@ -571,9 +619,14 @@
 
   <div class="body">
 
-    <!-- Account -->
-    <div>
-      <div class="section-label">Account</div>
+    <!-- Authentication is its own screen. The app is revealed after sign-in. -->
+    <section class="screen auth-screen" id="auth-view">
+      <div class="auth-intro">
+        <div class="auth-mark">T</div>
+        <h2>Welcome to Tailr</h2>
+        <p>Sign in to access your résumé and tailor it for the job on this page.</p>
+      </div>
+
       <div class="account-card">
         <form class="auth-form" id="auth-form">
           <input class="auth-input" type="email" id="user-email" placeholder="you@example.com"
@@ -586,7 +639,20 @@
           </div>
           <div class="auth-status" id="auth-status"></div>
         </form>
+      </div>
 
+      <details class="api-settings">
+        <summary>Connection settings</summary>
+        <div class="settings-row">
+          <label>API</label>
+          <input type="url" id="server-url" placeholder="https://tailr-api.onrender.com">
+        </div>
+      </details>
+    </section>
+
+    <section class="screen app-screen hidden" id="app-view">
+      <!-- Compact account row on the authenticated app screen -->
+      <div class="account-card">
         <div class="account-session" id="account-session">
           <div class="account-badge" id="account-badge">T</div>
           <div class="account-copy">
@@ -596,12 +662,11 @@
           <button class="sign-out" id="logout-btn" type="button">Sign out</button>
         </div>
       </div>
-    </div>
 
-    <!-- Resume profile -->
-    <div>
-      <div class="section-label">Resume Profile</div>
-      <div class="resume-card">
+      <!-- Resume profile -->
+      <div>
+        <div class="section-label">Resume Profile</div>
+        <div class="resume-card">
 
         <!-- Empty / upload state -->
         <div class="resume-empty" id="resume-empty">
@@ -624,47 +689,39 @@
           <button class="resume-update" id="resume-update">Update</button>
         </div>
 
-      </div>
-    </div>
-
-    <hr>
-
-    <!-- Job description -->
-    <div>
-      <div class="section-label">Job Detected</div>
-      <input class="jd-title" id="jd-title" placeholder="Job title" spellcheck="false">
-      <input class="jd-company" id="jd-company" placeholder="Company" spellcheck="false">
-      <textarea class="jd-preview" id="jd-preview" spellcheck="false"
-        placeholder="Job description — edit or paste here if extraction missed it."></textarea>
-      <div class="jd-chars" id="jd-chars"></div>
-
-      <div class="match" id="match">
-        <div class="match-head">
-          <span class="match-label">Resume match</span>
-          <span class="match-pct" id="match-pct">—</span>
         </div>
-        <div class="match-bar">
-          <div class="match-fill" id="match-fill"></div>
+      </div>
+
+      <hr>
+
+      <!-- Job description -->
+      <div>
+        <div class="section-label">Job Detected</div>
+        <input class="jd-title" id="jd-title" placeholder="Job title" spellcheck="false">
+        <input class="jd-company" id="jd-company" placeholder="Company" spellcheck="false">
+        <textarea class="jd-preview" id="jd-preview" spellcheck="false"
+          placeholder="Job description — edit or paste here if extraction missed it."></textarea>
+        <div class="jd-chars" id="jd-chars"></div>
+
+        <div class="match" id="match">
+          <div class="match-head">
+            <span class="match-label">Resume match</span>
+            <span class="match-pct" id="match-pct">—</span>
+          </div>
+          <div class="match-bar">
+            <div class="match-fill" id="match-fill"></div>
+          </div>
+          <div class="match-note" id="match-note"></div>
         </div>
-        <div class="match-note" id="match-note"></div>
       </div>
-    </div>
 
-    <hr>
+      <hr>
 
-    <!-- Server (normally leave this on the deployed API) -->
-    <details class="api-settings">
-      <summary>Connection settings</summary>
-      <div class="settings-row">
-        <label>API</label>
-        <input type="url" id="server-url" placeholder="https://tailr-api.onrender.com">
-      </div>
-    </details>
-
-    <!-- Action -->
-    <button class="tailor-btn" id="tailor-btn" disabled>Tailor Resume</button>
-    <div class="tailor-status" id="tailor-status"></div>
-    <button class="download-btn" id="download-btn">📄 Open Résumé → Save as PDF</button>
+      <!-- Action -->
+      <button class="tailor-btn" id="tailor-btn" disabled>Tailor Resume</button>
+      <div class="tailor-status" id="tailor-status"></div>
+      <button class="download-btn" id="download-btn">📄 Open Résumé → Save as PDF</button>
+    </section>
 
   </div>
 
