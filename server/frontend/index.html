@@ -133,8 +133,7 @@
   <h1>Tailr</h1>
   <input id="q" placeholder="search" size="14">
   <button onclick="load()">Apply</button>
-  <button class="primary" onclick="matchForMe()">🎯 Match for me</button>
-  <button onclick="refresh()">↻ Fetch</button>
+  <button class="primary" onclick="matchForMe()">🎯 Match jobs</button>
   <button id="linkedin-refresh" onclick="refreshLinkedIn()">LinkedIn (1/day)</button>
   <button onclick="openResume()">📄 Resume</button>
   <button onclick="openPrefs()">⚙ Preferences</button>
@@ -148,8 +147,7 @@
 <div id="empty" style="display:none;color:var(--muted);padding:24px;line-height:1.7;">
   <b style="color:var(--text)">Your board is empty — nothing has been scored for you yet.</b><br>
   1. <b>⚙ Preferences</b> → set your target <b>titles</b> (this is what makes matching relevant).<br>
-  2. <b>↻ Fetch</b> to pull the latest jobs into the shared pool (optional — already populated).<br>
-  3. <b>🎯 Match for me</b> to score jobs against your profile — scored cards then appear here.<br>
+  2. <b>🎯 Match jobs</b> to score the jobs already in the database for your profile.<br>
   <span style="font-size:12px">Low-fit jobs are auto-parked in the collapsed <b>Skipped</b> column.</span>
 </div>
 
@@ -388,11 +386,6 @@ async function move(id, status) {
   dragId = null;
   load();
 }
-async function refresh() {
-  setStatus("fetching…");
-  const r = await (await api("/jobs/refresh", { method:"POST" })).json();
-  setStatus(`+${r.new_jobs} new jobs`); load();
-}
 function setLinkedInButton(allowed, nextReset = null) {
   const button = $("linkedin-refresh");
   button.disabled = !allowed;
@@ -419,7 +412,7 @@ async function refreshLinkedIn() {
       return;
     }
     setLinkedInButton(false, body.next_reset_at);
-    setStatus(`LinkedIn: +${body.new_jobs} new jobs — click Match for me to score them`);
+    setStatus(`LinkedIn: +${body.new_jobs} new jobs — click Match jobs to score them`);
   } catch {
     button.disabled = false;
     setStatus("LinkedIn refresh failed — try again");
@@ -427,7 +420,12 @@ async function refreshLinkedIn() {
 }
 async function matchForMe() {
   setStatus("screening against your preferences…");
-  const r = await (await api("/jobs/match", { method:"POST" })).json();
+  const response = await api("/jobs/match", { method:"POST" });
+  const r = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    setStatus(errorDetail(r, "matching failed (" + response.status + ")"));
+    return;
+  }
   setStatus(`screened ${r.screened} (of ${r.candidates} matching prefs, ${r.remaining} left)`); load();
 }
 

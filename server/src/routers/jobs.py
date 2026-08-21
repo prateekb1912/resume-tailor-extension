@@ -114,13 +114,12 @@ def update_status(
     return job
 
 
-@router.post("/refresh")
+@router.post("/refresh", deprecated=True)
 def refresh_jobs(
     profile: Profile = Depends(get_current_profile), db: Session = Depends(get_db)
 ) -> dict[str, int]:
-    seeded = scraper_service.seed_companies(db)
-    fetched = scraper_service.fetch_jobs(db)
-    return {"companies_seeded": seeded, "new_jobs": fetched}
+    """Compatibility alias: account-facing refresh means match existing database jobs."""
+    return matching_service.match_profile(profile.email, db)
 
 
 @router.get("/refresh/linkedin")

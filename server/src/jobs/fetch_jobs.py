@@ -4,9 +4,10 @@ every onboarded profile so boards fill without anyone clicking Match.
 Run locally:   pipenv run python -m src.jobs.fetch_jobs
 On Render:     a Cron Job service with this as its command.
 
-This is the ONLY place the global paid-source flags are used. The ordinary /jobs/refresh
-remains free-source-only; the separate authenticated /jobs/refresh/linkedin endpoint runs
-only LinkedIn and enforces one manual Apify trigger per account per UTC day.
+This is the only external-ingestion entrypoint. Account-facing `/jobs/match` and the legacy
+`/jobs/refresh` alias only match jobs already in the database. The separate authenticated
+`/jobs/refresh/linkedin` endpoint runs only LinkedIn and enforces one manual Apify trigger
+per account per UTC day.
 """
 
 import logging

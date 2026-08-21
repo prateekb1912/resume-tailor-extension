@@ -47,7 +47,7 @@ class Settings(BaseSettings):
     apify_aggregator_count: int = 10
     apify_aggregator_max_queries: int = 6
 
-    # Workable global-feed discovery (free, no token). Bounds keep /jobs/refresh snappy.
+    # Workable global-feed discovery (free, no token). Used only by scheduled ingestion.
     workable_max_pages: int = 3       # feed pages per location (~100 jobs/page)
     workable_max_locations: int = 3   # distinct user locations queried per run
 
