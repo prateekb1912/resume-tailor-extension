@@ -23,6 +23,8 @@ class JobSource(str, Enum):
     LEVER = "lever"
     WORKABLE = "workable"
     LINKEDIN = "linkedin"
+    INDEED = "indeed"
+    NAUKRI = "naukri"
 
 
 class ApplicationStatus(str, Enum):

@@ -30,6 +30,14 @@ uv run pytest tests/ -v
 uv run ruff check src/
 ```
 
+## Scheduled job sources
+
+The GitHub Actions fetch workflow runs Greenhouse, Lever and Workable every six hours. Its
+daily run also fetches LinkedIn, Indeed and Naukri through Apify. Configure `APIFY_TOKEN` as
+a GitHub Actions secret. Indeed and Naukri default to six title/location queries with ten
+results per query per source. Set the optional `APIFY_AGGREGATOR_*` GitHub repository variables
+to change those caps, or the actor-ID variables if either community Actor is replaced.
+
 ## Structure
 
 ```

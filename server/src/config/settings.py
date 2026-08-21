@@ -39,6 +39,14 @@ class Settings(BaseSettings):
     apify_count: int = 10  # results per search title (quota control)
     apify_max_titles: int = 10  # cap distinct title searches per run
 
+    # Indeed + Naukri paid Apify sources. These run only in the daily scheduled job or
+    # an explicitly requested workflow dispatch. Query and result caps bound spend.
+    apify_indeed_actor_id: str = "crawlerbros~indeed-jobs-scraper"
+    apify_naukri_actor_id: str = "epicscrapers~naukri-scraper"
+    apify_indeed_country: str = "IN"
+    apify_aggregator_count: int = 10
+    apify_aggregator_max_queries: int = 6
+
     # Workable global-feed discovery (free, no token). Bounds keep /jobs/refresh snappy.
     workable_max_pages: int = 3       # feed pages per location (~100 jobs/page)
     workable_max_locations: int = 3   # distinct user locations queried per run
