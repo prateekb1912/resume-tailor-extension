@@ -5,7 +5,7 @@ from fastapi import HTTPException, status
 from pypdf import PdfReader
 from sqlalchemy.orm import Session
 
-from src.models import Profile, TailorJob
+from src.models import JobMatch, Profile, TailorJob
 from src.schemas.profile import (
     Preferences,
     ProfileData,
@@ -15,6 +15,24 @@ from src.schemas.profile import (
 from src.services import llm
 
 logger = logging.getLogger(__name__)
+
+
+def _invalidate_matches(profile: Profile, db: Session, reason: str) -> int:
+    """Remove scores computed from an older profile/preferences snapshot."""
+    if profile.id is None:
+        return 0
+    deleted = (
+        db.query(JobMatch)
+        .filter(JobMatch.profile_id == profile.id)
+        .delete(synchronize_session=False)
+    )
+    logger.info(
+        "match_cache_invalidated profile_id=%s reason=%s deleted=%s",
+        profile.id,
+        reason,
+        deleted,
+    )
+    return deleted
 
 
 def _extract_pdf_links(reader: PdfReader) -> list[str]:
@@ -60,7 +78,7 @@ def _extract_pdf_text(reader: PdfReader) -> str:
 def _infer_preferences(profile: Profile, profile_data: ProfileData) -> None:
     """Refresh résumé-derived preferences while retaining the user's manual filters."""
     try:
-        inferred = llm.infer_preferences(profile_data)
+        inferred = llm.infer_preferences(profile_data, profile_id=profile.id)
     except Exception as exc:  # noqa: BLE001 — inference is a nicety, never fail the parse
         logger.warning("preference inference failed: %s", exc)
         return
@@ -80,7 +98,8 @@ def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> Pr
     text = _extract_pdf_text(reader)
     links = _extract_pdf_links(reader)
 
-    raw = llm.extract_resume(text)
+    profile = get_profile(email, db)
+    raw = llm.extract_resume(text, profile_id=profile.id if profile else None)
     profile_data = ProfileData.model_validate(raw)
 
     categorized = _categorize_links(links)
@@ -92,8 +111,6 @@ def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> Pr
         url for url in links if url.startswith(("http://", "https://")) and url not in promoted
     ]
 
-    profile = get_profile(email, db)
-
     if not profile:
         profile = Profile(email=email)
         db.add(profile)
@@ -101,6 +118,7 @@ def create_profile_with_resume(email: str, file_bytes: bytes, db: Session) -> Pr
     _infer_preferences(profile, profile_data)  # may set profile_data.years_experience
     profile.data = profile_data.model_dump()
     profile.name = profile_data.name
+    _invalidate_matches(profile, db, "resume_parse")
 
     db.commit()
     db.refresh(profile)
@@ -124,6 +142,7 @@ def update_profile_data(email: str, data: ProfileData, db: Session) -> Profile:
     _infer_preferences(profile, data)
     profile.data = data.model_dump()
     profile.name = data.name or profile.name
+    _invalidate_matches(profile, db, "profile_update")
     db.commit()
     db.refresh(profile)
     return profile
@@ -138,6 +157,7 @@ def set_preferences(email: str, preferences: Preferences, db: Session) -> Profil
         )
 
     profile.preferences = preferences.model_dump()
+    _invalidate_matches(profile, db, "preferences_update")
     db.commit()
     db.refresh(profile)
     return profile
@@ -155,7 +175,12 @@ def tailor_resume_to_job(payload: TailorResumePayload, db: Session) -> TailoredR
 
     try:
         tailored_resume = llm.tailor_resume(
-            payload.company, payload.job_title, payload.job_description, profile_data, preferences
+            payload.company,
+            payload.job_title,
+            payload.job_description,
+            profile_data,
+            preferences,
+            profile_id=profile.id,
         )
     except llm.LLMConfigurationError as exc:
         raise HTTPException(

@@ -588,6 +588,8 @@ async function saveProfile() {
   if (titles.length) {
     $("resume-summary").textContent = "Profile saved — target titles: " + titles.join(", ");
   }
+  await load();
+  $("resume-status").textContent = "saved ✓ — click Match jobs to refresh scores";
 }
 
 async function openPrefs() {
@@ -618,7 +620,7 @@ async function savePrefs() {
   $("prefs-status").textContent = "saving…";
   const res = await api("/profile/preferences", { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(preferences) });
   if (!res.ok) { $("prefs-status").textContent = "save failed (" + res.status + ")"; return; }
-  closePrefs(); setStatus("preferences saved");
+  closePrefs(); await load(); setStatus("preferences saved — click Match jobs to refresh scores");
 }
 
 boot();

@@ -1,4 +1,7 @@
+import json
 import logging
+import time
+import uuid
 from typing import Any
 
 from langchain.agents import create_agent
@@ -21,6 +24,78 @@ logger = logging.getLogger(__name__)
 
 class LLMConfigurationError(RuntimeError):
     """Raised when no configured provider can serve an LLM request."""
+
+
+def _model_name(value: Any) -> str:
+    return str(getattr(value, "value", value))
+
+
+def _token_usage(response: Any) -> dict[str, int]:
+    """Extract LangChain token metadata when the provider returned it."""
+    if not isinstance(response, dict):
+        return {}
+    for message in reversed(response.get("messages") or []):
+        usage = getattr(message, "usage_metadata", None)
+        if not usage:
+            metadata = getattr(message, "response_metadata", None) or {}
+            usage = metadata.get("token_usage") or metadata.get("usage")
+        if isinstance(usage, dict):
+            return {
+                str(key): int(value)
+                for key, value in usage.items()
+                if isinstance(value, (int, float))
+            }
+    return {}
+
+
+def _invoke_logged(
+    agent: Any,
+    payload: dict[str, Any],
+    *,
+    operation: str,
+    provider: str,
+    model: Any,
+    metadata: dict[str, Any] | None = None,
+) -> dict[str, Any]:
+    """Invoke an agent and emit safe structured lifecycle logs without prompt contents."""
+    run_id = str(uuid.uuid4())
+    base = {
+        "event": "llm_run",
+        "run_id": run_id,
+        "operation": operation,
+        "provider": provider,
+        "model": _model_name(model),
+        **{key: value for key, value in (metadata or {}).items() if value is not None},
+    }
+    logger.info(json.dumps({**base, "status": "started"}, default=str, sort_keys=True))
+    started = time.perf_counter()
+    try:
+        response = agent.invoke(payload)
+    except Exception as exc:
+        logger.exception(
+            json.dumps(
+                {
+                    **base,
+                    "status": "error",
+                    "duration_ms": round((time.perf_counter() - started) * 1000),
+                    "error_type": type(exc).__name__,
+                },
+                default=str,
+                sort_keys=True,
+            )
+        )
+        raise
+
+    completed = {
+        **base,
+        "status": "completed",
+        "duration_ms": round((time.perf_counter() - started) * 1000),
+    }
+    usage = _token_usage(response)
+    if usage:
+        completed["token_usage"] = usage
+    logger.info(json.dumps(completed, default=str, sort_keys=True))
+    return response
 
 _PARSE_SYSTEM_PROMPT = (
     "You are a precise resume parser. Extract the candidate's resume into the given "
@@ -97,14 +172,21 @@ _TAILOR_RESUME_PROMPT = """
 """
 
 
-def extract_resume(text: str) -> dict[str, Any]:
+def extract_resume(text: str, *, profile_id: Any = None) -> dict[str, Any]:
     model = ChatOpenAI(model=ModelNames.GPT_5_5, api_key=SecretStr(settings.openai_api_key))
     agent = create_agent(
         model=model,
         system_prompt=_PARSE_SYSTEM_PROMPT,
         response_format=ProfileData,
     )
-    response = agent.invoke({"messages": [{"role": "user", "content": f"Resume text:\n\n{text}"}]})
+    response = _invoke_logged(
+        agent,
+        {"messages": [{"role": "user", "content": f"Resume text:\n\n{text}"}]},
+        operation="resume_parse",
+        provider="openai",
+        model=ModelNames.GPT_5_5,
+        metadata={"profile_id": profile_id, "input_chars": len(text)},
+    )
     return response["structured_response"]
 
 
@@ -120,13 +202,20 @@ _INFER_PREFS_PROMPT = (
 )
 
 
-def infer_preferences(profile: ProfileData) -> InferredPreferences:
+def infer_preferences(profile: ProfileData, *, profile_id: Any = None) -> InferredPreferences:
     """One cheap call to seed a new user's search prefs so matching is relevant day one."""
     model = ChatOpenAI(model=ModelNames.GPT_5_5, api_key=SecretStr(settings.openai_api_key))
     agent = create_agent(
         model=model, system_prompt=_INFER_PREFS_PROMPT, response_format=InferredPreferences
     )
-    response = agent.invoke({"messages": [{"role": "user", "content": profile.model_dump_json()}]})
+    response = _invoke_logged(
+        agent,
+        {"messages": [{"role": "user", "content": profile.model_dump_json()}]},
+        operation="preference_inference",
+        provider="openai",
+        model=ModelNames.GPT_5_5,
+        metadata={"profile_id": profile_id},
+    )
     return response["structured_response"]
 
 
@@ -149,11 +238,19 @@ def _format_preferences(preferences: Preferences) -> str:
     return "\n    ".join(lines) if lines else "- No specific preferences provided"
 
 
-def _invoke_tailor_agent(model: Any, system_prompt: str) -> TailoredResumeResult:
+def _invoke_tailor_agent(
+    model: Any,
+    system_prompt: str,
+    *,
+    provider: str,
+    model_name: Any,
+    metadata: dict[str, Any],
+) -> TailoredResumeResult:
     agent = create_agent(
         model=model, system_prompt=system_prompt, response_format=TailoredResumeResult
     )
-    response = agent.invoke(
+    response = _invoke_logged(
+        agent,
         {
             "messages": [
                 {
@@ -164,7 +261,11 @@ def _invoke_tailor_agent(model: Any, system_prompt: str) -> TailoredResumeResult
                     ),
                 }
             ]
-        }
+        },
+        operation="resume_tailor",
+        provider=provider,
+        model=model_name,
+        metadata=metadata,
     )
     return response["structured_response"]
 
@@ -175,6 +276,8 @@ def tailor_resume(
     job_description: str,
     profile: ProfileData,
     preferences: Preferences,
+    *,
+    profile_id: Any = None,
 ) -> TailoredResumeResult:
     system_prompt = _TAILOR_RESUME_PROMPT.format(
         job_title=job_title,
@@ -186,6 +289,12 @@ def tailor_resume(
 
     anthropic_key = settings.anthropic_api_key.strip()
     openai_key = settings.openai_api_key.strip()
+    run_metadata = {
+        "profile_id": profile_id,
+        "job_title": job_title,
+        "company": company,
+        "jd_chars": len(job_description),
+    }
 
     if anthropic_key:
         try:
@@ -195,7 +304,13 @@ def tailor_resume(
                 timeout=None,
                 stop=None,
             )
-            return _invoke_tailor_agent(model, system_prompt)
+            return _invoke_tailor_agent(
+                model,
+                system_prompt,
+                provider="anthropic",
+                model_name=ModelNames.CLAUDE_SONNET_5,
+                metadata=run_metadata,
+            )
         except Exception:  # noqa: BLE001 — retry the configured fallback provider
             if not openai_key:
                 raise
@@ -205,7 +320,13 @@ def tailor_resume(
         if not anthropic_key:
             logger.warning("ANTHROPIC_API_KEY is not set; using OpenAI for tailoring")
         model = ChatOpenAI(model=ModelNames.GPT_5_5, api_key=SecretStr(openai_key))
-        return _invoke_tailor_agent(model, system_prompt)
+        return _invoke_tailor_agent(
+            model,
+            system_prompt,
+            provider="openai",
+            model_name=ModelNames.GPT_5_5,
+            metadata=run_metadata,
+        )
 
     raise LLMConfigurationError(
         "Tailoring is not configured: set ANTHROPIC_API_KEY or OPENAI_API_KEY on the server."
@@ -237,7 +358,8 @@ Return an integer match_score (0-100), a one or two sentence reason, and missing
 
 def screen_job(
     profile: ProfileData, title: str, company: str, location: str, description: str,
-    preferences: Preferences,
+    preferences: Preferences, *, profile_id: Any = None, job_id: Any = None,
+    match_run_id: str | None = None,
 ) -> FitAssessment:
     system_prompt = _SCREEN_SYSTEM_PROMPT.format(
         preferences=_format_preferences(preferences),
@@ -252,5 +374,19 @@ def screen_job(
         f"Role:\nTitle: {title}\nCompany: {company}\nLocation: {location}\n\n"
         f"Job description:\n{description[:6000]}"
     )
-    response = agent.invoke({"messages": [{"role": "user", "content": user}]})
+    response = _invoke_logged(
+        agent,
+        {"messages": [{"role": "user", "content": user}]},
+        operation="job_screen",
+        provider="openai",
+        model=ModelNames.GPT_5_5,
+        metadata={
+            "profile_id": profile_id,
+            "job_id": job_id,
+            "match_run_id": match_run_id,
+            "job_title": title,
+            "company": company,
+            "jd_chars": len(description),
+        },
+    )
     return response["structured_response"]
