@@ -1,7 +1,4 @@
-import json
 import logging
-import time
-import uuid
 from concurrent.futures import ThreadPoolExecutor, as_completed
 from datetime import datetime, timedelta, timezone
 
@@ -41,12 +38,7 @@ def _prefilter(jobs: list[Job], prefs: Preferences) -> list[Job]:
 
 
 def _screen_all(
-    db: Session,
-    profile: Profile,
-    profile_data: ProfileData,
-    prefs: Preferences,
-    jobs: list[Job],
-    match_run_id: str,
+    db: Session, profile: Profile, profile_data: ProfileData, prefs: Preferences, jobs: list[Job]
 ) -> int:
     """Screen jobs concurrently (LLM calls are I/O-bound). Worker threads only touch
     pre-extracted primitives + the LLM; every DB write stays on this (main) thread."""
@@ -58,17 +50,7 @@ def _screen_all(
 
     def screen(payload):
         job, title, company, location, description = payload
-        return job, llm.screen_job(
-            profile_data,
-            title,
-            company,
-            location,
-            description,
-            prefs,
-            profile_id=profile.id,
-            job_id=job.id,
-            match_run_id=match_run_id,
-        )
+        return job, llm.screen_job(profile_data, title, company, location, description, prefs)
 
     screened = 0
     with ThreadPoolExecutor(max_workers=settings.match_workers) as pool:
@@ -115,30 +97,7 @@ def match_profile(email: str, db: Session, limit: int | None = None) -> dict[str
     if limit is not None:
         todo = todo[:limit]
 
-    match_run_id = str(uuid.uuid4())
-    started = time.perf_counter()
-    run_metadata = {
-        "event": "match_run",
-        "match_run_id": match_run_id,
-        "profile_id": profile.id,
-        "candidates": len(candidates),
-        "cached": len(already),
-        "queued": len(todo),
-    }
-    logger.info(json.dumps({**run_metadata, "status": "started"}, default=str, sort_keys=True))
-    screened = _screen_all(db, profile, profile_data, prefs, todo, match_run_id)
-    logger.info(
-        json.dumps(
-            {
-                **run_metadata,
-                "status": "completed",
-                "screened": screened,
-                "duration_ms": round((time.perf_counter() - started) * 1000),
-            },
-            default=str,
-            sort_keys=True,
-        )
-    )
+    screened = _screen_all(db, profile, profile_data, prefs, todo)
 
     return {
         "candidates": len(candidates),

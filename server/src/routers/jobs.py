@@ -83,6 +83,7 @@ def list_jobs(
         jr = JobResponse.model_validate(job)
         jr.match_score = match.match_score
         jr.reason = match.reason
+        jr.missing_skills = match.missing_skills or []
         result.append(jr)
 
     if q:

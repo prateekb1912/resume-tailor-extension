@@ -39,16 +39,6 @@ results per query per source. Set the optional `APIFY_AGGREGATOR_*` GitHub repos
 to change those caps, or the actor-ID variables if either community Actor is replaced. Paid
 sources are one grouped workflow option; no scraper controls are shown in the web dashboard.
 
-## LLM observability
-
-Every parse, preference-inference, tailoring and job-screening call emits structured JSON at
-INFO level with `event=llm_run`, a run ID, operation, provider/model, safe profile/job IDs,
-duration, status and provider token usage when available. Prompt, résumé and job-description
-contents are deliberately excluded. View API calls in Render service logs and scheduled matching
-calls in the corresponding GitHub Actions run; filter either log stream for `"event": "llm_run"`.
-Each matching batch also emits `event=match_run`; its `match_run_id` is copied into all associated
-job-screen logs so one click or scheduled batch can be traced end-to-end.
-
 ## Structure
 
 ```

@@ -1,6 +1,3 @@
-import json
-import logging
-
 import pytest
 
 from src.schemas.profile import FitAssessment, Preferences, ProfileData, TailoredResumeResult
@@ -23,35 +20,6 @@ class _Agent:
         if self.error:
             raise self.error
         return {"structured_response": self.result}
-
-
-class _UsageMessage:
-    usage_metadata = {"input_tokens": 120, "output_tokens": 30, "total_tokens": 150}
-
-
-def test_llm_run_logs_lifecycle_metadata_and_usage_without_prompt(caplog):
-    class Agent:
-        def invoke(self, _payload):
-            return {"structured_response": "ok", "messages": [_UsageMessage()]}
-
-    with caplog.at_level(logging.INFO, logger=llm.__name__):
-        result = llm._invoke_logged(
-            Agent(),
-            {"messages": [{"role": "user", "content": "private resume contents"}]},
-            operation="job_screen",
-            provider="openai",
-            model="test-model",
-            metadata={"profile_id": "profile-1", "job_id": "job-1"},
-        )
-
-    events = [json.loads(record.message) for record in caplog.records]
-    assert result["structured_response"] == "ok"
-    assert [event["status"] for event in events] == ["started", "completed"]
-    assert events[0]["operation"] == "job_screen"
-    assert events[0]["provider"] == "openai"
-    assert events[0]["profile_id"] == "profile-1"
-    assert events[1]["token_usage"]["total_tokens"] == 150
-    assert "private resume contents" not in caplog.text
 
 
 def test_tailor_uses_openai_when_anthropic_key_is_missing(monkeypatch):

@@ -36,8 +36,8 @@
   .auth-actions { display:grid; grid-template-columns:1fr 1fr; gap:8px; }
   .auth-actions button { padding:9px 10px; }
 
-  #board { display:flex; gap:10px; padding:14px 16px; align-items:flex-start; }
-  .col { flex:1 1 0; min-width:0; background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 8px 10px; box-shadow:var(--shadow); }
+  #board { display:flex; gap:10px; padding:14px 16px; align-items:flex-start; overflow-x:auto; }
+  .col { flex:0 0 300px; min-width:300px; background:#fff; border:1px solid var(--line); border-radius:12px; padding:8px 8px 10px; box-shadow:var(--shadow); }
   .col-head { display:flex; align-items:center; justify-content:space-between; padding:4px 4px 8px; border-bottom:1px solid var(--line2); margin-bottom:6px; }
   .pill { font-size:12px; font-weight:600; padding:3px 12px; border-radius:999px; text-transform:capitalize; }
   .count { color:var(--muted); font-size:12px; font-weight:600; }
@@ -53,16 +53,27 @@
   .col.collapsed .col-body { display:none; }
   .col.collapsed .col-head { writing-mode:vertical-rl; height:auto; padding:10px 0; gap:10px; justify-content:flex-start; border-bottom:none; margin-bottom:0; }
 
-  .card { background:var(--card); border:1px solid var(--line); border-radius:10px; padding:10px 11px; box-shadow:var(--shadow); cursor:grab; }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:11px; padding:0; overflow:hidden; box-shadow:var(--shadow); cursor:grab; }
   .card:active { cursor:grabbing; }
-  .card h3 { margin:0 0 8px; font-size:14px; font-weight:600; line-height:1.25; }
-  .field { margin-bottom:7px; }
-  .field .lbl { display:flex; align-items:center; gap:5px; color:var(--muted); font-size:11px; margin-bottom:1px; }
-  .field .val { font-size:12.5px; word-break:break-word; }
-  .field a { color:var(--link); text-decoration:none; }
-  .field a:hover { text-decoration:underline; }
-  .score { display:inline-block; font-weight:700; font-size:13px; padding:1px 8px; border-radius:6px; }
-  .ic { width:13px; height:13px; opacity:.7; }
+  .card-main { padding:13px 13px 11px; }
+  .card-head { display:flex; gap:10px; justify-content:space-between; align-items:flex-start; }
+  .card-heading { min-width:0; }
+  .card-company { color:var(--muted); font-size:11px; font-weight:700; letter-spacing:.035em; text-transform:uppercase; overflow-wrap:anywhere; }
+  .card h3 { margin:3px 0 0; font-size:14px; font-weight:650; line-height:1.35; overflow-wrap:anywhere; }
+  .match-score { flex:0 0 auto; min-width:52px; border-radius:9px; padding:6px 7px; text-align:center; }
+  .match-score strong { display:block; font-size:17px; line-height:1; }
+  .match-score span { display:block; margin-top:2px; font-size:9px; font-weight:700; text-transform:uppercase; letter-spacing:.04em; }
+  .card-meta { display:flex; align-items:center; flex-wrap:wrap; gap:6px 8px; margin-top:10px; color:#667085; font-size:11px; }
+  .location { min-width:0; overflow-wrap:anywhere; }
+  .source-tag { border:1px solid var(--line); border-radius:999px; background:#f7f8fa; padding:2px 7px; color:#596273; font-size:9px; font-weight:700; letter-spacing:.04em; text-transform:uppercase; }
+  .match-detail { padding:11px 13px; border-top:1px solid var(--line2); background:#fafbff; }
+  .match-detail h4 { margin:0 0 5px; color:#596273; font-size:10px; letter-spacing:.05em; text-transform:uppercase; }
+  .match-detail p { margin:0; color:#344054; font-size:12px; line-height:1.45; }
+  .missing-skills { display:flex; flex-wrap:wrap; gap:5px; margin-top:9px; }
+  .skill-chip { border-radius:999px; background:#fff1f3; color:#c43256; padding:3px 7px; font-size:10px; font-weight:600; }
+  .card-footer { display:flex; align-items:center; justify-content:space-between; gap:8px; padding:9px 13px; border-top:1px solid var(--line2); color:var(--muted); font-size:10px; }
+  .card-footer a { color:var(--link); font-size:11px; font-weight:650; text-decoration:none; white-space:nowrap; }
+  .card-footer a:hover { text-decoration:underline; }
 
   #empty { color:var(--muted); padding:24px; }
   .overlay { position:fixed; inset:0; background:rgba(15,23,42,.4); display:none; align-items:flex-start; justify-content:center; padding:40px 16px; overflow:auto; z-index:10; }
@@ -360,18 +371,31 @@ function cardEl(j) {
   el.className = "card";
   el.draggable = true;
   el.addEventListener("dragstart", () => { dragId = j.id; });
-  const shortUrl = j.url.replace(/^https?:\/\/(www\.)?/, "").slice(0, 34) + "…";
-  const posted = j.posted_at ? j.posted_at.replace("T", "  ").slice(0, 16) : "—";
-  const scoreField = (j.match_score != null) ? `
-    <div class="field"><div class="lbl"># match_score</div>
-      <div class="val"><span class="score" style="background:${scoreColor(j.match_score)}" title="${esc(j.reason)}">${j.match_score}</span></div></div>` : "";
+  const date = j.posted_at ? new Date(j.posted_at) : null;
+  const posted = date && !Number.isNaN(date.getTime())
+    ? date.toLocaleDateString(undefined, { day:"numeric", month:"short", year:"numeric" })
+    : "Date unavailable";
+  const missing = Array.isArray(j.missing_skills) ? j.missing_skills.filter(Boolean) : [];
+  const score = j.match_score != null ? `
+    <div class="match-score" style="background:${scoreColor(j.match_score)}" aria-label="Match score ${j.match_score} out of 100">
+      <strong>${j.match_score}</strong><span>match</span>
+    </div>` : "";
+  const reason = (j.reason || missing.length) ? `
+    <div class="match-detail">
+      <h4>Why this match</h4>
+      <p>${esc(j.reason || "No written explanation was returned for this score.")}</p>
+      ${missing.length ? `<div class="missing-skills" aria-label="Missing skills">${missing.map(skill => `<span class="skill-chip">${esc(skill)}</span>`).join("")}</div>` : ""}
+    </div>` : "";
   el.innerHTML = `
-    <h3>${esc(j.company)}</h3>
-    <div class="field"><div class="lbl">T job_title</div><div class="val">${esc(j.title)}</div></div>
-    <div class="field"><div class="lbl">🔗 job_url</div><div class="val"><a href="${esc(j.url)}" target="_blank" rel="noopener">${esc(shortUrl)}</a></div></div>
-    <div class="field"><div class="lbl">📅 processed_at</div><div class="val">${posted}</div></div>
-    ${scoreField}
-    <div class="field"><div class="lbl">· source</div><div class="val">${esc(j.location || "")} <span style="color:var(--muted)">(${j.source})</span></div></div>`;
+    <div class="card-main">
+      <div class="card-head">
+        <div class="card-heading"><div class="card-company">${esc(j.company)}</div><h3>${esc(j.title)}</h3></div>
+        ${score}
+      </div>
+      <div class="card-meta"><span class="location">📍 ${esc(j.location || "Location not listed")}</span><span class="source-tag">${esc(j.source)}</span></div>
+    </div>
+    ${reason}
+    <div class="card-footer"><span>Posted ${posted}</span><a href="${esc(j.url)}" target="_blank" rel="noopener">View posting ↗</a></div>`;
   return el;
 }
 

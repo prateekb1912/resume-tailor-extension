@@ -1,7 +1,7 @@
 import uuid
 from datetime import datetime
 
-from pydantic import BaseModel, ConfigDict
+from pydantic import BaseModel, ConfigDict, Field
 
 from src.config.enums import ApplicationStatus
 
@@ -20,6 +20,7 @@ class JobResponse(BaseModel):
     # populated only for the per-user matched feed (?email=)
     match_score: int | None = None
     reason: str | None = None
+    missing_skills: list[str] = Field(default_factory=list)
 
 
 class JobStatusUpdate(BaseModel):
