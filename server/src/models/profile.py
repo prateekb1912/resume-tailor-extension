@@ -16,8 +16,10 @@ class Profile(Base, UUIDMixin, TimestampMixin):
     name: Mapped[str | None] = mapped_column(String(64), nullable=True)
     email: Mapped[str | None] = mapped_column(String(255), nullable=True, unique=True)
     password_hash: Mapped[str | None] = mapped_column(String(255), nullable=True)
-    last_linkedin_refresh_at: Mapped[datetime | None] = mapped_column(
-        DateTime(timezone=True), nullable=True
+    # Keep the existing database column name for a migration-free rollout; the allowance now
+    # covers every paid scraper rather than LinkedIn alone.
+    last_paid_refresh_at: Mapped[datetime | None] = mapped_column(
+        "last_linkedin_refresh_at", DateTime(timezone=True), nullable=True
     )
     preferences: Mapped[dict[str, Any]] = mapped_column(
         JSONB, nullable=False, default=dict, server_default=text("'{}'::jsonb")

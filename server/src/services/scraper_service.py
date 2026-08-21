@@ -247,9 +247,7 @@ def _aggregator_items(queries: list[tuple[str, str]]) -> list[dict[str, Any]]:
     return items
 
 
-def fetch_jobs(
-    db: Session, include_linkedin: bool = False, include_aggregators: bool = False
-) -> int:
+def fetch_jobs(db: Session, include_paid_sources: bool = False) -> int:
     """Fetch + store new jobs. Paid sources are opt-in for the daily scheduled run."""
     seen: set[str] = {key for (key,) in db.query(Job.dedup_key).all()}
     new_count = 0
@@ -258,14 +256,25 @@ def fetch_jobs(
         new_count += _store(db, _board_items(db, source), seen)
     # Free feed source (auto-discovery — any company hiring on Workable in a user's location).
     new_count += _store(db, _workable_items(db), seen)
-    if include_linkedin:
-        new_count += _store(db, _linkedin_items(_linkedin_titles(db)), seen)
-    if include_aggregators:
-        new_count += _store(db, _aggregator_items(_aggregator_queries(db)), seen)
+    if include_paid_sources:
+        paid_items = _linkedin_items(_linkedin_titles(db))
+        paid_items.extend(_aggregator_items(_aggregator_queries(db)))
+        new_count += _store(db, paid_items, seen)
     return new_count
 
 
-def fetch_linkedin_jobs(db: Session, titles: list[str]) -> int:
-    """Run the paid LinkedIn/Apify source only, scoped to one account's titles."""
+def fetch_paid_jobs(
+    db: Session, titles: list[str], locations: list[str]
+) -> int:
+    """Run every paid source together, scoped to one account and one shared allowance."""
     seen: set[str] = {key for (key,) in db.query(Job.dedup_key).all()}
-    return _store(db, _linkedin_items(titles[: settings.apify_max_titles]), seen)
+    account_titles = titles[: settings.apify_max_titles]
+    account_locations = locations or [settings.apify_location]
+    queries = [
+        (title, location)
+        for title in account_titles
+        for location in account_locations
+    ][: settings.apify_aggregator_max_queries]
+    items = _linkedin_items(account_titles)
+    items.extend(_aggregator_items(queries))
+    return _store(db, items, seen)

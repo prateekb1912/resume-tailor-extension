@@ -24,20 +24,20 @@ def _next_utc_day(now: datetime) -> datetime:
     return datetime.combine(now.date() + timedelta(days=1), time.min, tzinfo=timezone.utc)
 
 
-def _linkedin_refresh_state(
+def _paid_refresh_state(
     profile: Profile, now: datetime | None = None
 ) -> tuple[bool, datetime | None]:
     now = _utc(now or datetime.now(timezone.utc))
-    last = profile.last_linkedin_refresh_at
+    last = profile.last_paid_refresh_at
     if last is None or _utc(last).date() < now.date():
         return True, None
     return False, _next_utc_day(now)
 
 
-def _claim_linkedin_refresh(
+def _claim_paid_refresh(
     profile_id: uuid.UUID, db: Session, now: datetime | None = None
 ) -> datetime:
-    """Atomically consume today's manual LinkedIn allowance for one profile."""
+    """Atomically consume today's shared manual paid-scraper allowance."""
     now = _utc(now or datetime.now(timezone.utc))
     profile = (
         db.query(Profile)
@@ -46,19 +46,19 @@ def _claim_linkedin_refresh(
         .with_for_update()
         .one()
     )
-    allowed, next_reset = _linkedin_refresh_state(profile, now)
+    allowed, next_reset = _paid_refresh_state(profile, now)
     if not allowed:
         retry_after = max(1, ceil((next_reset - now).total_seconds()))
         raise HTTPException(
             status_code=status.HTTP_429_TOO_MANY_REQUESTS,
             detail={
-                "message": "LinkedIn can be refreshed manually once per account per UTC day.",
+                "message": "Paid job sources can be refreshed once per account per UTC day.",
                 "next_reset_at": next_reset.isoformat(),
             },
             headers={"Retry-After": str(retry_after)},
         )
 
-    profile.last_linkedin_refresh_at = now
+    profile.last_paid_refresh_at = now
     db.commit()
     return _next_utc_day(now)
 
@@ -122,25 +122,14 @@ def refresh_jobs(
     return matching_service.match_profile(profile.email, db)
 
 
-@router.get("/refresh/linkedin")
-def linkedin_refresh_status(
-    profile: Profile = Depends(get_current_profile),
-) -> dict[str, bool | str | None]:
-    allowed, next_reset = _linkedin_refresh_state(profile)
-    return {
-        "allowed": allowed,
-        "next_reset_at": next_reset.isoformat() if next_reset else None,
-    }
-
-
-@router.post("/refresh/linkedin")
-def refresh_linkedin_jobs(
+@router.post("/refresh/paid", include_in_schema=False)
+def refresh_paid_jobs(
     profile: Profile = Depends(get_current_profile), db: Session = Depends(get_db)
 ) -> dict[str, int | str]:
     if not settings.apify_token.strip():
         raise HTTPException(
             status_code=status.HTTP_503_SERVICE_UNAVAILABLE,
-            detail="LinkedIn refresh is unavailable because APIFY_TOKEN is not configured.",
+            detail="Paid job refresh is unavailable because APIFY_TOKEN is not configured.",
         )
 
     titles: list[str] = []
@@ -151,9 +140,15 @@ def refresh_linkedin_jobs(
     if not titles:
         raise HTTPException(
             status_code=status.HTTP_400_BAD_REQUEST,
-            detail="Add at least one target title in Preferences before refreshing LinkedIn.",
+            detail="Add at least one target title in Preferences before refreshing paid sources.",
         )
 
-    next_reset = _claim_linkedin_refresh(profile.id, db)
-    fetched = scraper_service.fetch_linkedin_jobs(db, titles)
+    locations: list[str] = []
+    for value in (profile.preferences or {}).get("locations", []):
+        location = value.strip() if isinstance(value, str) else ""
+        if location and location not in locations:
+            locations.append(location)
+
+    next_reset = _claim_paid_refresh(profile.id, db)
+    fetched = scraper_service.fetch_paid_jobs(db, titles, locations)
     return {"new_jobs": fetched, "next_reset_at": next_reset.isoformat()}

@@ -5,9 +5,9 @@ Run locally:   pipenv run python -m src.jobs.fetch_jobs
 On Render:     a Cron Job service with this as its command.
 
 This is the only external-ingestion entrypoint. Account-facing `/jobs/match` and the legacy
-`/jobs/refresh` alias only match jobs already in the database. The separate authenticated
-`/jobs/refresh/linkedin` endpoint runs only LinkedIn and enforces one manual Apify trigger
-per account per UTC day.
+`/jobs/refresh` alias only match jobs already in the database. A hidden authenticated paid
+refresh endpoint groups LinkedIn, Indeed and Naukri under one manual trigger per account per
+UTC day.
 """
 
 import logging
@@ -22,16 +22,11 @@ logger = logging.getLogger(__name__)
 
 def main() -> None:
     # The daily schedule enables paid Apify sources; every-6h runs refresh only free sources.
-    include_linkedin = os.getenv("INCLUDE_LINKEDIN", "").lower() in ("1", "true", "yes")
-    include_aggregators = os.getenv("INCLUDE_AGGREGATORS", "").lower() in ("1", "true", "yes")
+    include_paid_sources = os.getenv("INCLUDE_PAID_SOURCES", "").lower() in ("1", "true", "yes")
     db = SessionLocal()
     try:
         seeded = scraper_service.seed_companies(db)
-        new_jobs = scraper_service.fetch_jobs(
-            db,
-            include_linkedin=include_linkedin,
-            include_aggregators=include_aggregators,
-        )
+        new_jobs = scraper_service.fetch_jobs(db, include_paid_sources=include_paid_sources)
         logger.info("seeded %s companies; fetched %s new jobs", seeded, new_jobs)
         matched = matching_service.match_active_profiles(db)
         logger.info(
