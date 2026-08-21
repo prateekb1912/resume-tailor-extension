@@ -1,17 +1,16 @@
 import io
 import logging
 
-from sqlalchemy.orm import Session
-
 from fastapi import HTTPException, status
 from pypdf import PdfReader
+from sqlalchemy.orm import Session
 
 from src.models import Profile, TailorJob
 from src.schemas.profile import (
     Preferences,
     ProfileData,
-    TailorResumePayload,
     TailoredResumeResult,
+    TailorResumePayload,
 )
 from src.services import llm
 
@@ -59,8 +58,7 @@ def _extract_pdf_text(reader: PdfReader) -> str:
 
 
 def _infer_preferences(profile: Profile, profile_data: ProfileData) -> None:
-    """Seed search prefs + years of experience from the résumé. Years is a factual attribute
-    (always refresh it); search prefs are only seeded, never clobbering the user's own."""
+    """Refresh résumé-derived preferences while retaining the user's manual filters."""
     try:
         inferred = llm.infer_preferences(profile_data)
     except Exception as exc:  # noqa: BLE001 — inference is a nicety, never fail the parse
@@ -70,11 +68,9 @@ def _infer_preferences(profile: Profile, profile_data: ProfileData) -> None:
     profile_data.years_experience = inferred.years_experience
 
     prefs = Preferences.model_validate(profile.preferences or {})
-    if prefs.titles:
-        return  # user already has search prefs — don't overwrite them
     prefs.titles = inferred.titles
     prefs.seniority = inferred.seniority
-    if profile_data.location and not prefs.locations:
+    if profile_data.location:
         prefs.locations = [profile_data.location]
     profile.preferences = prefs.model_dump()
 
@@ -125,6 +121,7 @@ def update_profile_data(email: str, data: ProfileData, db: Session) -> Profile:
             detail=f"No profile found with the associated email: {email}",
         )
 
+    _infer_preferences(profile, data)
     profile.data = data.model_dump()
     profile.name = data.name or profile.name
     db.commit()
@@ -150,8 +147,7 @@ def tailor_resume_to_job(payload: TailorResumePayload, db: Session) -> TailoredR
     profile = get_profile(payload.email, db)
     if not profile:
         raise HTTPException(
-            status_code=404,
-            detail=f"No profile found with the associated email: {payload.email}"
+            status_code=404, detail=f"No profile found with the associated email: {payload.email}"
         )
 
     profile_data = ProfileData.model_validate(profile.data)

@@ -576,7 +576,12 @@ async function saveProfile() {
     method: "PUT", headers: { "Content-Type": "application/json" }, body: JSON.stringify(data),
   });
   if (!res.ok) { $("resume-status").textContent = "save failed (" + res.status + ")"; return; }
-  $("resume-status").textContent = "saved ✓";
+  const body = await res.json();
+  const titles = (body.preferences || {}).titles || [];
+  $("resume-status").textContent = "saved ✓ — search preferences refreshed";
+  if (titles.length) {
+    $("resume-summary").textContent = "Profile saved — target titles: " + titles.join(", ");
+  }
 }
 
 async function openPrefs() {
