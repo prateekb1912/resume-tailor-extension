@@ -7,6 +7,7 @@ const extensionDir = new URL('extension/', repoDir);
 const backgroundSource = readFileSync(new URL('background.js', extensionDir), 'utf8');
 const popupHtml = readFileSync(new URL('popup.html', extensionDir), 'utf8');
 const popupSource = readFileSync(new URL('popup.js', extensionDir), 'utf8');
+const printSource = readFileSync(new URL('print.js', extensionDir), 'utf8');
 
 function storageArea(state) {
   return {
@@ -52,7 +53,7 @@ function backgroundHarness(initialState, fetchImpl) {
 }
 
 const manifest = JSON.parse(readFileSync(new URL('manifest.json', extensionDir), 'utf8'));
-assert.equal(manifest.version, '1.1.1');
+assert.equal(manifest.version, '1.1.2');
 assert(manifest.host_permissions.includes('https://tailr-api.onrender.com/*'));
 
 for (const path of [
@@ -77,6 +78,26 @@ assert(popupSource.includes("action: 'getWorkerVersion'"));
 assert(popupHtml.includes('id="auth-view"'));
 assert(popupHtml.includes('id="app-view"'));
 assert(popupHtml.includes('class="screen app-screen hidden"'));
+
+{
+  const elements = {
+    resume: { innerHTML: '' },
+    'print-btn': { addEventListener() {} },
+  };
+  const context = {
+    chrome: { storage: { local: { async get() { return {}; } } } },
+    document: { getElementById: (id) => elements[id], title: '' },
+    setTimeout() {},
+    window: { print() {} },
+  };
+  vm.runInNewContext(printSource, context, { filename: 'print.js' });
+  const rendered = context.buildResumeHtml({
+    experience: [{ title: 'Engineer', startDate: '2024-01', current: true }],
+    education: [{ school: 'Example University', startDate: '2020-08', endDate: '2024-05' }],
+  });
+  assert(rendered.includes('Jan 2024 – Present'));
+  assert(rendered.includes('Aug 2020 – May 2024'));
+}
 
 {
   const { context, sendMessage, state } = backgroundHarness({}, async () => {

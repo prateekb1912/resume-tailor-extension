@@ -26,6 +26,14 @@ const display = (v) => String(v).replace(/^https?:\/\//i, '').replace(/\/$/, '')
 // mapping. Drop anything before the first digit, + or ( so the number reads clean.
 const cleanPhone = (v) => String(v).replace(/^[^\d+(]+/, '').trim();
 
+function formatMonth(v) {
+  const value = String(v || '').trim();
+  const match = value.match(/^(\d{4})-(\d{2})(?:-\d{2})?$/);
+  if (!match) return value;
+  const date = new Date(Number(match[1]), Number(match[2]) - 1, 1);
+  return date.toLocaleDateString('en-US', { month: 'short', year: 'numeric' });
+}
+
 function link(text, url) {
   return url ? `<a href="${esc(url)}">${esc(text)}</a>` : esc(text);
 }
@@ -68,7 +76,8 @@ function buildResumeHtml(p) {
   // ── Experience ──
   if (p.experience?.length) {
     const body = p.experience.map((e) => {
-      const dates = [e.startDate, e.endDate].filter(Boolean).map(esc).join(' – ');
+      const dates = [formatMonth(e.startDate), e.current ? 'Present' : formatMonth(e.endDate)]
+        .filter(Boolean).map(esc).join(' – ');
       const bullets = (e.bullets || []).map((b) => `<li>${esc(b)}</li>`).join('');
       return `<div class="entry">
         <div class="entry-row"><span class="left">${esc(e.title || '')}</span><span class="right">${dates}</span></div>
@@ -98,8 +107,12 @@ function buildResumeHtml(p) {
   if (p.education?.length) {
     const body = p.education.map((ed) => {
       const sub = [ed.degree, ed.gpa && `GPA ${ed.gpa}`].filter(Boolean).map(esc).join(' · ');
+      const dates = [
+        formatMonth(ed.startDate),
+        ed.current ? 'Present' : formatMonth(ed.endDate || ed.year),
+      ].filter(Boolean).map(esc).join(' – ');
       return `<div class="entry">
-        <div class="entry-row"><span class="left">${esc(ed.school || '')}</span><span class="right">${esc(ed.year || '')}</span></div>
+        <div class="entry-row"><span class="left">${esc(ed.school || '')}</span><span class="right">${dates}</span></div>
         ${sub ? `<div class="entry-sub">${sub}</div>` : ''}
       </div>`;
     }).join('');

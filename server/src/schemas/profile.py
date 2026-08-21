@@ -1,4 +1,4 @@
-from pydantic import BaseModel, ConfigDict, Field, EmailStr
+from pydantic import BaseModel, ConfigDict, EmailStr, Field, model_validator
 
 from src.config.enums import WorkType
 
@@ -8,9 +8,18 @@ class Experience(BaseModel):
 
     title: str = ""
     company: str = ""
-    startDate: str = ""
-    endDate: str = ""
+    startDate: str = Field(default="", description="Start month in YYYY-MM format")
+    endDate: str = Field(default="", description="End month in YYYY-MM format")
+    current: bool = False
     bullets: list[str] = Field(default_factory=list)
+
+    @model_validator(mode="after")
+    def normalize_current_job(self):
+        if self.endDate.strip().lower() in {"current", "present", "now"}:
+            self.current = True
+        if self.current:
+            self.endDate = ""
+        return self
 
 
 class Education(BaseModel):
@@ -18,8 +27,19 @@ class Education(BaseModel):
 
     degree: str = ""
     school: str = ""
-    year: str = ""
+    startDate: str = Field(default="", description="Start month in YYYY-MM format")
+    endDate: str = Field(default="", description="End month in YYYY-MM format")
+    current: bool = False
+    year: str = Field(default="", description="Legacy graduation date")
     gpa: str = ""
+
+    @model_validator(mode="after")
+    def normalize_current_education(self):
+        if self.endDate.strip().lower() in {"current", "present", "now"}:
+            self.current = True
+        if self.current:
+            self.endDate = ""
+        return self
 
 
 class Project(BaseModel):

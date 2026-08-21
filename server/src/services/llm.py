@@ -25,7 +25,9 @@ class LLMConfigurationError(RuntimeError):
 _PARSE_SYSTEM_PROMPT = (
     "You are a precise resume parser. Extract the candidate's resume into the given "
     "structure. Use empty strings or empty arrays for anything not present. Do not "
-    "invent, infer, or embellish any information."
+    "invent, infer, or embellish any information. Store experience and education dates "
+    "at month precision in YYYY-MM format. For an ongoing job or education, set current "
+    "to true and leave endDate empty."
 )
 
 _TAILOR_RESUME_PROMPT = """

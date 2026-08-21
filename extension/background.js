@@ -1,6 +1,6 @@
 const TIMEOUT_MS = 120_000;
 const STORAGE_KEY_TOKEN = 'accessToken';
-const WORKER_VERSION = '1.1.1';
+const WORKER_VERSION = '1.1.2';
 
 chrome.runtime.onMessage.addListener((message, sender, sendResponse) => {
   if (message.action === 'getWorkerVersion') {
