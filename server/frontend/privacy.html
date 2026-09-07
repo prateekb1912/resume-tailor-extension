@@ -13,48 +13,59 @@
   .updated { color:var(--muted); font-size:13px; margin-bottom:28px; }
   h2 { font-size:16px; margin:28px 0 8px; }
   p, li { line-height:1.6; font-size:14px; }
-  ul { padding-left:20px; }
+  ol { padding-left:20px; }
   a { color:var(--accent); }
   .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px 28px; box-shadow:0 1px 2px rgba(16,24,40,.06); }
+  .card > ol > li { margin-bottom:18px; }
+  .card > ol > li::marker { font-weight:600; }
 </style>
 </head>
 <body>
 <main>
-  <h1>Tailr — Privacy Policy</h1>
+  <h1>Privacy Policy for Tailr</h1>
   <div class="updated">Last updated: September 7, 2026</div>
   <div class="card">
-    <p>Tailr ("we", "the extension") is a Chrome extension and companion web dashboard that helps you tailor your résumé to job descriptions. This page explains what data we collect, why, and how it's handled.</p>
-
-    <h2>Account information</h2>
-    <p>Creating an account requires an email address and password. Passwords are stored as salted hashes, never in plain text. Your email is used only to identify your account and is never sold or shared with third parties.</p>
-
-    <h2>Résumé data</h2>
-    <p>When you upload a résumé (PDF), we parse it into structured fields (name, contact info, work history, education, skills, projects) and store that profile on our servers, associated with your account. This profile is used to generate tailored résumés and is only ever shown to you.</p>
-
-    <h2>Job description data</h2>
-    <p>To tailor your résumé, the extension reads the job title, company, and description from the job posting page you're currently viewing when you click "Tailor Resume." This content is sent to our backend for that request and is not stored beyond what's needed to process it and show you the resulting match score and tailored résumé.</p>
-
-    <h2>Job preferences and matching</h2>
-    <p>If you set search preferences (target titles, locations, seniority, exclusions), we store them to score job listings against your profile on the web dashboard. Job listing data (title, company, source, posted date) comes from public job boards, not from you.</p>
-
-    <h2>Third-party AI providers</h2>
-    <p>Résumé parsing, résumé tailoring, and job-fit scoring are performed using large language model APIs (OpenAI and/or Anthropic). Your résumé content and the job description text are sent to these providers solely to generate the parsed/tailored output — they are not used by us to train models, and we don't control the providers' own data retention, which is governed by their respective privacy policies.</p>
-
-    <h2>Local browser storage</h2>
-    <p>The extension keeps a session token, your cached résumé profile, and in-progress tailoring results in Chrome's local extension storage (chrome.storage.local) on your device, so the popup can work without re-fetching data constantly. This data is cleared when you sign out.</p>
-
-    <h2>What we don't do</h2>
-    <ul>
-      <li>We don't sell or share your data with advertisers or data brokers.</li>
-      <li>We don't read or collect data from pages other than the job posting content described above, and only when you actively use the extension.</li>
-      <li>We don't use your résumé or job description content for anything other than fulfilling your request.</li>
-    </ul>
-
-    <h2>Data deletion</h2>
-    <p>You can delete your résumé profile at any time from the dashboard, or request full account deletion by contacting us below.</p>
-
-    <h2>Contact</h2>
-    <p>Questions about this policy or your data? Open an issue on the <a href="https://github.com/prateekb1912/resume-tailor-extension/issues" target="_blank" rel="noopener">GitHub repository</a>.</p>
+    <ol>
+      <li>
+        <h2 style="display:inline">Overview</h2>
+        <p>Tailr ("the extension") is a Chrome browser extension, with a companion web dashboard, that helps you tailor your resume to job descriptions. This policy explains what data we collect, how we use it, and how it is protected.</p>
+      </li>
+      <li>
+        <h2 style="display:inline">Data we collect</h2>
+        <p><b>Resume data</b> — your resume content (work experience, skills, education, contact info) that you upload to the extension.</p>
+        <p><b>Job description text</b> — the text of job listings you choose to tailor your resume against, extracted from the page you are currently viewing.</p>
+        <p><b>Account information</b> — your email address and password (stored as a salted hash), used to authenticate you with the Tailr service.</p>
+        <p><b>Job preferences</b> — if you use the web dashboard, search preferences (target titles, locations, seniority, exclusions) you set to match job listings against your profile.</p>
+      </li>
+      <li>
+        <h2 style="display:inline">How we use your data</h2>
+        <p>Your resume and job description data are sent to our backend server (hosted at tailr-api.onrender.com) to generate a tailored version of your resume and a job-fit score. We do not use your data for advertising or profiling, or for any purpose beyond providing the tailoring and matching service.</p>
+      </li>
+      <li>
+        <h2 style="display:inline">Data storage</h2>
+        <p>Your resume profile and preferences are stored on our backend, associated with your account, so they persist across sessions and are available to both the extension and the web dashboard. The extension also caches your session token, resume profile, and pending tailoring results locally in Chrome's storage API, so the popup works without constantly re-fetching data; this local cache is cleared when you sign out.</p>
+      </li>
+      <li>
+        <h2 style="display:inline">Third-party AI providers</h2>
+        <p>Resume parsing, resume tailoring, and job-fit scoring are performed using large language model APIs (OpenAI and/or Anthropic). Your resume content and job description text are sent to these providers solely to generate that output — they are not used by us to train models, and their own retention is governed by their respective privacy policies.</p>
+      </li>
+      <li>
+        <h2 style="display:inline">Data sharing</h2>
+        <p>We do not sell, rent, or share your personal data with advertisers, data brokers, or any other third party. Resume and job description content is transmitted only between your browser, the Tailr backend (operated solely by us), and the AI providers described above.</p>
+      </li>
+      <li>
+        <h2 style="display:inline">Data security</h2>
+        <p>All communication between the extension, the dashboard, and our backend is encrypted in transit via HTTPS.</p>
+      </li>
+      <li>
+        <h2 style="display:inline">Your rights</h2>
+        <p>You can delete your resume profile at any time from the dashboard. You can clear all locally cached data by signing out or removing the extension from Chrome. To request full account deletion, contact us below.</p>
+      </li>
+      <li>
+        <h2 style="display:inline">Contact</h2>
+        <p>Questions about this policy or your data? Open an issue on the <a href="https://github.com/prateekb1912/resume-tailor-extension/issues" target="_blank" rel="noopener">GitHub repository</a>.</p>
+      </li>
+    </ol>
   </div>
 </main>
 </body>
