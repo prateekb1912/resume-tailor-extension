@@ -1,0 +1,61 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Tailr — Privacy Policy</title>
+<style>
+  :root { --bg:#f6f7f9; --card:#ffffff; --line:#e3e6ea; --text:#1f2733; --muted:#8a94a3; --accent:#4f46e5; }
+  * { box-sizing:border-box; }
+  body { margin:0; font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
+  main { max-width:760px; margin:0 auto; padding:40px 20px 80px; }
+  h1 { font-size:26px; margin:0 0 4px; }
+  .updated { color:var(--muted); font-size:13px; margin-bottom:28px; }
+  h2 { font-size:16px; margin:28px 0 8px; }
+  p, li { line-height:1.6; font-size:14px; }
+  ul { padding-left:20px; }
+  a { color:var(--accent); }
+  .card { background:var(--card); border:1px solid var(--line); border-radius:12px; padding:24px 28px; box-shadow:0 1px 2px rgba(16,24,40,.06); }
+</style>
+</head>
+<body>
+<main>
+  <h1>Tailr — Privacy Policy</h1>
+  <div class="updated">Last updated: September 7, 2026</div>
+  <div class="card">
+    <p>Tailr ("we", "the extension") is a Chrome extension and companion web dashboard that helps you tailor your résumé to job descriptions. This page explains what data we collect, why, and how it's handled.</p>
+
+    <h2>Account information</h2>
+    <p>Creating an account requires an email address and password. Passwords are stored as salted hashes, never in plain text. Your email is used only to identify your account and is never sold or shared with third parties.</p>
+
+    <h2>Résumé data</h2>
+    <p>When you upload a résumé (PDF), we parse it into structured fields (name, contact info, work history, education, skills, projects) and store that profile on our servers, associated with your account. This profile is used to generate tailored résumés and is only ever shown to you.</p>
+
+    <h2>Job description data</h2>
+    <p>To tailor your résumé, the extension reads the job title, company, and description from the job posting page you're currently viewing when you click "Tailor Resume." This content is sent to our backend for that request and is not stored beyond what's needed to process it and show you the resulting match score and tailored résumé.</p>
+
+    <h2>Job preferences and matching</h2>
+    <p>If you set search preferences (target titles, locations, seniority, exclusions), we store them to score job listings against your profile on the web dashboard. Job listing data (title, company, source, posted date) comes from public job boards, not from you.</p>
+
+    <h2>Third-party AI providers</h2>
+    <p>Résumé parsing, résumé tailoring, and job-fit scoring are performed using large language model APIs (OpenAI and/or Anthropic). Your résumé content and the job description text are sent to these providers solely to generate the parsed/tailored output — they are not used by us to train models, and we don't control the providers' own data retention, which is governed by their respective privacy policies.</p>
+
+    <h2>Local browser storage</h2>
+    <p>The extension keeps a session token, your cached résumé profile, and in-progress tailoring results in Chrome's local extension storage (chrome.storage.local) on your device, so the popup can work without re-fetching data constantly. This data is cleared when you sign out.</p>
+
+    <h2>What we don't do</h2>
+    <ul>
+      <li>We don't sell or share your data with advertisers or data brokers.</li>
+      <li>We don't read or collect data from pages other than the job posting content described above, and only when you actively use the extension.</li>
+      <li>We don't use your résumé or job description content for anything other than fulfilling your request.</li>
+    </ul>
+
+    <h2>Data deletion</h2>
+    <p>You can delete your résumé profile at any time from the dashboard, or request full account deletion by contacting us below.</p>
+
+    <h2>Contact</h2>
+    <p>Questions about this policy or your data? Open an issue on the <a href="https://github.com/prateekb1912/resume-tailor-extension/issues" target="_blank" rel="noopener">GitHub repository</a>.</p>
+  </div>
+</main>
+</body>
+</html>
