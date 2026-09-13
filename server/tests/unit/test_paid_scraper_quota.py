@@ -114,6 +114,69 @@ def test_hidden_paid_refresh_runs_all_sources_under_shared_claim(monkeypatch):
     assert db.commits == 1
 
 
+def test_combined_refresh_fetches_then_matches(monkeypatch):
+    profile = _profile()
+    db = _Db(profile)
+    calls = []
+
+    monkeypatch.setattr(jobs.settings, "apify_token", "test-token")
+    monkeypatch.setattr(
+        jobs.scraper_service,
+        "fetch_paid_jobs",
+        lambda session, titles, locations: calls.append(
+            ("fetch", session, titles, locations)
+        )
+        or 4,
+    )
+    monkeypatch.setattr(
+        jobs.matching_service,
+        "match_profile",
+        lambda email, session: calls.append(("match", email, session))
+        or {"candidates": 6, "screened": 6, "remaining": 0},
+    )
+
+    result = jobs.refresh_jobs(profile, db)
+
+    assert calls == [
+        ("fetch", db, ["Backend Engineer"], ["Bengaluru"]),
+        ("match", profile.email, db),
+    ]
+    assert datetime.fromisoformat(result["next_reset_at"]).tzinfo is not None
+    assert result == {
+        "new_jobs": 4,
+        "fetch_status": "fetched",
+        "next_reset_at": result["next_reset_at"],
+        "candidates": 6,
+        "screened": 6,
+        "remaining": 0,
+    }
+
+
+def test_combined_refresh_reuses_database_after_daily_fetch_limit(monkeypatch):
+    profile = _profile()
+    profile.last_paid_refresh_at = datetime.now(timezone.utc)
+    db = _Db(profile)
+
+    monkeypatch.setattr(jobs.settings, "apify_token", "test-token")
+    monkeypatch.setattr(
+        jobs.scraper_service,
+        "fetch_paid_jobs",
+        lambda *_args: (_ for _ in ()).throw(AssertionError("must not fetch twice")),
+    )
+    monkeypatch.setattr(
+        jobs.matching_service,
+        "match_profile",
+        lambda email, session: {"candidates": 3, "screened": 3, "remaining": 0},
+    )
+
+    result = jobs.refresh_jobs(profile, db)
+
+    assert result["new_jobs"] == 0
+    assert result["fetch_status"] == "daily_limit"
+    assert result["next_reset_at"] is not None
+    assert result["screened"] == 3
+
+
 def test_paid_refresh_is_not_advertised_in_openapi():
     paths = app.openapi()["paths"]
 

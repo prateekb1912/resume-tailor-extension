@@ -5,10 +5,14 @@ from src.models import Job, Profile
 from src.routers import jobs
 
 
-def test_legacy_refresh_matches_existing_jobs_without_scraping(monkeypatch):
-    profile = Profile(email="person@example.com", data={}, preferences={})
+def test_refresh_still_matches_when_fresh_job_source_is_not_configured(monkeypatch):
+    profile = Profile(
+        email="person@example.com", data={}, preferences={"titles": ["Platform Engineer"]}
+    )
     db = object()
     expected = {"candidates": 12, "screened": 8, "remaining": 4}
+
+    monkeypatch.setattr(jobs.settings, "apify_token", "")
 
     monkeypatch.setattr(
         jobs.matching_service,
@@ -23,7 +27,12 @@ def test_legacy_refresh_matches_existing_jobs_without_scraping(monkeypatch):
         lambda *_args, **_kwargs: (_ for _ in ()).throw(AssertionError("must not scrape")),
     )
 
-    assert jobs.refresh_jobs(profile, db) == expected
+    assert jobs.refresh_jobs(profile, db) == {
+        "new_jobs": 0,
+        "fetch_status": "not_configured",
+        "next_reset_at": None,
+        **expected,
+    }
 
 
 class _MatchedJobsQuery:

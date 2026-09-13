@@ -144,7 +144,7 @@
   <h1>Tailr</h1>
   <input id="q" placeholder="search" size="14">
   <button onclick="load()">Apply</button>
-  <button class="primary" onclick="matchForMe()">🎯 Match jobs</button>
+  <button class="primary" id="refresh-jobs" onclick="matchForMe()">↻ Refresh jobs</button>
   <button onclick="openResume()">📄 Resume</button>
   <button onclick="openPrefs()">⚙ Preferences</button>
   <span id="status" style="color:var(--muted);font-size:12px;"></span>
@@ -156,8 +156,8 @@
 <div id="board"></div>
 <div id="empty" style="display:none;color:var(--muted);padding:24px;line-height:1.7;">
   <b style="color:var(--text)">Your board is empty — nothing has been scored for you yet.</b><br>
-  1. <b>⚙ Preferences</b> → set your target <b>titles</b> (this is what makes matching relevant).<br>
-  2. <b>🎯 Match jobs</b> to score the jobs already in the database for your profile.<br>
+  Set your target titles under <b>⚙ Preferences</b> and save. Tailr will look for fresh jobs and match them automatically.<br>
+  Use <b>↻ Refresh jobs</b> whenever you want to run matching again.<br>
   <span style="font-size:12px">Low-fit jobs are auto-parked in the collapsed <b>Skipped</b> column.</span>
 </div>
 
@@ -187,7 +187,7 @@
   <div class="modal">
     <h2>Preferences</h2>
     <div class="sub" id="prefs-for"></div>
-    <div class="fld"><label>Target titles (comma-separated)</label><input type="text" id="pf-titles" placeholder="Backend Engineer, AI Engineer"></div>
+    <div class="fld"><label>Target titles (separate alternatives with commas, /, or " - ")</label><input type="text" id="pf-titles" placeholder="Oracle HCM, SAP HCM, ServiceNow HRSD, Workday HCM"></div>
     <div class="fld"><label>Locations (comma-separated)</label><input type="text" id="pf-locations" placeholder="Bengaluru, India, Remote"></div>
     <div class="fld"><label>Seniority (comma-separated)</label><input type="text" id="pf-seniority" placeholder="mid, senior"></div>
     <div class="fld"><label>Work types</label><div class="checks">
@@ -218,6 +218,7 @@ const collapsed = new Set(JSON.parse(localStorage.getItem("collapsed") || "[]"))
 let lastJobs = [];
 const setStatus = m => document.getElementById("status").textContent = m;
 const csv = s => s.split(",").map(x => x.trim()).filter(Boolean);
+const targetTitles = s => s.split(/\s+[\-–—]\s+|[,/\n]+/).map(x => x.trim()).filter(Boolean);
 const joinCsv = a => (a || []).join(", ");
 const $ = id => document.getElementById(id);
 const errorDetail = (body, fallback) => typeof body?.detail === "string"
@@ -409,15 +410,31 @@ async function move(id, status) {
   dragId = null;
   load();
 }
-async function matchForMe() {
-  setStatus("screening against your preferences…");
-  const response = await api("/jobs/match", { method:"POST" });
-  const r = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    setStatus(errorDetail(r, "matching failed (" + response.status + ")"));
-    return;
+async function matchForMe(prefix = "") {
+  const button = $("refresh-jobs");
+  button.disabled = true;
+  setStatus(prefix + "looking for fresh jobs and matching…");
+  try {
+    const response = await api("/jobs/refresh", { method:"POST" });
+    const r = await response.json().catch(() => ({}));
+    if (!response.ok) {
+      setStatus(errorDetail(r, "job refresh failed (" + response.status + ")"));
+      return;
+    }
+    await load();
+    const fetchMessage = r.fetch_status === "fetched"
+      ? `found ${r.new_jobs} new jobs; `
+      : r.fetch_status === "daily_limit"
+        ? "fresh jobs already checked today; "
+        : r.fetch_status === "not_configured"
+          ? "fresh-job source unavailable; "
+          : "";
+    setStatus(`${prefix}${fetchMessage}screened ${r.screened} of ${r.candidates} matching jobs`);
+  } catch {
+    if (token) setStatus(prefix + "job refresh could not be completed");
+  } finally {
+    button.disabled = false;
   }
-  setStatus(`screened ${r.screened} (of ${r.candidates} matching prefs, ${r.remaining} left)`); load();
 }
 
 // ---- profile editor -----------------------------------------------------
@@ -635,7 +652,7 @@ function closePrefs() { $("prefs-overlay").classList.remove("show"); }
 async function savePrefs() {
   const work_types = ["wt-remote","wt-onsite","wt-hybrid"].filter(id => $(id).checked).map(id => $(id).value);
   const preferences = {
-    titles: csv($("pf-titles").value), locations: csv($("pf-locations").value), seniority: csv($("pf-seniority").value),
+    titles: targetTitles($("pf-titles").value), locations: csv($("pf-locations").value), seniority: csv($("pf-seniority").value),
     work_types, open_to_relocation: $("pf-relocation").checked,
     exclude_companies: csv($("pf-exclude-companies").value), exclude_keywords: csv($("pf-exclude-keywords").value),
     max_age_days: parseInt($("pf-max-age").value || "7", 10), min_match_score: parseInt($("pf-min-score").value || "60", 10),
@@ -644,7 +661,8 @@ async function savePrefs() {
   $("prefs-status").textContent = "saving…";
   const res = await api("/profile/preferences", { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(preferences) });
   if (!res.ok) { $("prefs-status").textContent = "save failed (" + res.status + ")"; return; }
-  closePrefs(); await load(); setStatus("preferences saved — click Match jobs to refresh scores");
+  closePrefs();
+  await matchForMe("preferences saved; ");
 }
 
 boot();

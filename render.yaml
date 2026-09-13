@@ -1,6 +1,6 @@
 # Render blueprint — web API + Postgres.
-# The 6-hourly fetch + auto-match runs on GitHub Actions (.github/workflows/fetch.yml),
-# not a Render cron (Render crons have no free plan).
+# Fresh preference-scoped jobs are fetched on demand by the web API. No separate cron is
+# bundled; the batch command in server/src/jobs/fetch_jobs.py can be scheduled externally.
 # Deploy: push to GitHub, then Render Dashboard → New → Blueprint → pick this repo.
 # Set the sync:false secrets (API keys) in the dashboard after the first deploy.
 databases:

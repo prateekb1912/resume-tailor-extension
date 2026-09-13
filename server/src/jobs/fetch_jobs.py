@@ -4,10 +4,9 @@ every onboarded profile so boards fill without anyone clicking Match.
 Run locally:   pipenv run python -m src.jobs.fetch_jobs
 On Render:     a Cron Job service with this as its command.
 
-This is the only external-ingestion entrypoint. Account-facing `/jobs/match` and the legacy
-`/jobs/refresh` alias only match jobs already in the database. A hidden authenticated paid
-refresh endpoint groups LinkedIn, Indeed and Naukri under one manual trigger per account per
-UTC day.
+This is the batch ingestion entrypoint for free sources and optional paid sources. The
+account-facing `/jobs/refresh` endpoint performs a preference-scoped paid refresh at most
+once per UTC day and then matches, while `/jobs/match` only matches existing database rows.
 """
 
 import logging

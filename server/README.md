@@ -30,14 +30,17 @@ uv run pytest tests/ -v
 uv run ruff check src/
 ```
 
-## Scheduled job sources
+## Job sources
 
-The GitHub Actions fetch workflow runs Greenhouse, Lever and Workable every six hours. Its
-daily run also fetches LinkedIn, Indeed and Naukri through Apify. Configure `APIFY_TOKEN` as
-a GitHub Actions secret. Indeed and Naukri default to six title/location queries with ten
-results per query per source. Set the optional `APIFY_AGGREGATOR_*` GitHub repository variables
-to change those caps, or the actor-ID variables if either community Actor is replaced. Paid
-sources are one grouped workflow option; no scraper controls are shown in the web dashboard.
+Saving preferences and the dashboard's **Refresh jobs** action call one combined operation:
+it fetches preference-scoped LinkedIn, Indeed and Naukri jobs through Apify (at most once per
+account per UTC day), then matches the available database jobs. Configure `APIFY_TOKEN` on the
+web service to enable fresh-job fetching. Indeed and Naukri default to six title/location
+queries with ten results per query per source.
+
+The repository does not currently bundle a scheduled workflow. To ingest the free Greenhouse,
+Lever and Workable sources as a batch, schedule `pipenv run python -m src.jobs.fetch_jobs` in
+the deployment environment.
 
 ## Structure
 
