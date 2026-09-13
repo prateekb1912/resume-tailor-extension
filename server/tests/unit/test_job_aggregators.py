@@ -1,4 +1,5 @@
 from datetime import datetime, timezone
+from urllib.parse import parse_qs, urlparse
 
 from src.config.enums import JobSource
 from src.services import scraper_service
@@ -75,8 +76,15 @@ def test_indeed_actor_request_and_normalization(monkeypatch):
         [("Backend Engineer", "Bengaluru")], "token", "actor~id", "IN", 10
     )
 
-    assert request["json"]["position"] == "Backend Engineer"
-    assert request["json"]["country"] == "IN"
+    start_url = request["json"]["startUrls"][0]["url"]
+    parsed = urlparse(start_url)
+    assert parsed.netloc == "in.indeed.com"
+    assert parse_qs(parsed.query) == {
+        "q": ["Backend Engineer"],
+        "l": ["Bengaluru"],
+        "fromage": ["7"],
+        "sort": ["date"],
+    }
     assert request["json"]["maxItemsPerSearch"] == 10
     assert jobs == [
         {
@@ -132,22 +140,21 @@ def test_naukri_actor_request_and_normalization(monkeypatch):
     assert jobs[0]["posted_at"] == created.isoformat()
 
 
-def test_actor_continues_after_one_query_fails(monkeypatch):
+def test_indeed_batches_all_queries_into_one_actor_run(monkeypatch):
     calls = 0
 
     def post(_url, json, timeout):
         nonlocal calls
         del timeout
         calls += 1
-        if calls == 1:
-            raise RuntimeError("temporary actor failure")
+        assert len(json["startUrls"]) == 2
         return _Response(
             [
                 {
-                    "id": "second-query-job",
-                    "positionName": json["position"],
+                    "id": "batched-job",
+                    "positionName": "Second",
                     "company": "Example Co",
-                    "description": "A sufficiently detailed description for the second query result.",
+                    "description": "A sufficiently detailed description returned by the batched actor.",
                 }
             ]
         )
@@ -162,5 +169,27 @@ def test_actor_continues_after_one_query_fails(monkeypatch):
         10,
     )
 
-    assert calls == 2
+    assert calls == 1
     assert [job["title"] for job in jobs] == ["Second"]
+
+
+def test_indeed_batch_failure_does_not_retry_each_query(monkeypatch):
+    calls = 0
+
+    def post(*_args, **_kwargs):
+        nonlocal calls
+        calls += 1
+        raise RuntimeError("temporary actor failure")
+
+    monkeypatch.setattr(indeed_apify.httpx, "post", post)
+
+    jobs = indeed_apify.fetch_jobs(
+        [("First", "Bengaluru"), ("Second", "Pune")],
+        "token",
+        "actor~id",
+        "IN",
+        10,
+    )
+
+    assert calls == 1
+    assert jobs == []

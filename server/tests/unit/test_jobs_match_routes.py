@@ -3,6 +3,8 @@ from types import SimpleNamespace
 
 from src.models import Job, Profile
 from src.routers import jobs
+from src.schemas.job import JobTitleSearch
+from src.schemas.profile import Preferences
 
 
 def test_refresh_still_matches_when_fresh_job_source_is_not_configured(monkeypatch):
@@ -33,6 +35,49 @@ def test_refresh_still_matches_when_fresh_job_source_is_not_configured(monkeypat
         "next_reset_at": None,
         **expected,
     }
+
+
+def test_title_search_replaces_only_titles_then_refreshes(monkeypatch):
+    profile = Profile(
+        email="person@example.com",
+        data={},
+        preferences={
+            "titles": ["Old title"],
+            "locations": ["Bengaluru"],
+            "seniority": ["senior"],
+            "work_types": ["hybrid"],
+            "exclude_companies": ["Example Corp"],
+            "exclude_keywords": ["sales"],
+            "open_to_relocation": True,
+            "max_age_days": 14,
+            "min_match_score": 72,
+            "screening_instructions": "Prefer implementation roles.",
+        },
+    )
+    db = object()
+    original = Preferences.model_validate(profile.preferences)
+    captured = {}
+
+    def set_preferences(email, preferences, session):
+        captured.update(email=email, preferences=preferences, session=session)
+        profile.preferences = preferences.model_dump()
+        return profile
+
+    monkeypatch.setattr(jobs.profile_service, "set_preferences", set_preferences)
+    monkeypatch.setattr(
+        jobs,
+        "refresh_jobs",
+        lambda updated, session: {"new_jobs": 2, "screened": 3},
+    )
+
+    result = jobs.search_jobs(JobTitleSearch(title="  HRBP  "), profile, db)
+
+    assert result == {"new_jobs": 2, "screened": 3}
+    assert captured["email"] == profile.email
+    assert captured["session"] is db
+    updated = captured["preferences"]
+    assert updated.titles == ["HRBP"]
+    assert updated.model_copy(update={"titles": original.titles}) == original
 
 
 class _MatchedJobsQuery:

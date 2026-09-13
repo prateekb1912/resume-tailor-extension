@@ -25,3 +25,7 @@ class JobResponse(BaseModel):
 
 class JobStatusUpdate(BaseModel):
     status: ApplicationStatus
+
+
+class JobTitleSearch(BaseModel):
+    title: str = Field(min_length=1, max_length=200)

@@ -32,15 +32,15 @@ class Settings(BaseSettings):
         origins = [o.strip() for o in self.cors_origins.split(",") if o.strip()]
         return origins or ["*"]
 
-    # LinkedIn scraping via Apify — CRON ONLY. Token from env (never hardcode).
+    # LinkedIn scraping via Apify. Interactive paid refreshes are limited in the jobs router.
     apify_token: str = ""
     apify_actor_id: str = "curious_coder~linkedin-jobs-scraper"
     apify_location: str = "India"
     apify_count: int = 10  # results per search title (quota control)
     apify_max_titles: int = 10  # cap distinct title searches per run
 
-    # Indeed + Naukri paid Apify sources. These run only in the daily scheduled job or
-    # an explicitly requested workflow dispatch. Query and result caps bound spend.
+    # Indeed + Naukri paid Apify sources. Query and result caps bound spend; Indeed sends
+    # all capped queries through one Actor invocation while Naukri currently fans them out.
     apify_indeed_actor_id: str = "crawlerbros~indeed-jobs-scraper"
     apify_naukri_actor_id: str = "epicscrapers~naukri-scraper"
     apify_indeed_country: str = "IN"

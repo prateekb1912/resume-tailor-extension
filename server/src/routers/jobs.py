@@ -10,8 +10,9 @@ from src.config.database import get_db
 from src.config.dependencies import get_current_profile
 from src.config.settings import settings
 from src.models import Job, JobMatch, Profile
-from src.schemas.job import JobResponse, JobStatusUpdate
-from src.services import matching_service, scraper_service
+from src.schemas.job import JobResponse, JobStatusUpdate, JobTitleSearch
+from src.schemas.profile import Preferences
+from src.services import matching_service, profile_service, scraper_service
 
 router = APIRouter()
 
@@ -168,6 +169,26 @@ def refresh_jobs(
         "next_reset_at": next_reset_at,
         **matched,
     }
+
+
+@router.post("/search")
+def search_jobs(
+    payload: JobTitleSearch,
+    profile: Profile = Depends(get_current_profile),
+    db: Session = Depends(get_db),
+) -> dict[str, int | str | None]:
+    """Replace only the target title, then refresh using all other saved preferences."""
+    title = payload.title.strip()
+    if not title:
+        raise HTTPException(
+            status_code=status.HTTP_400_BAD_REQUEST,
+            detail="Enter a job title to search for.",
+        )
+
+    preferences = Preferences.model_validate(profile.preferences or {})
+    preferences.titles = [title]
+    updated = profile_service.set_preferences(profile.email, preferences, db)
+    return refresh_jobs(updated, db)
 
 
 @router.post("/refresh/paid", include_in_schema=False)

@@ -13,6 +13,7 @@
   body { margin:0; font-family:'Inter',system-ui,-apple-system,Segoe UI,Roboto,sans-serif; background:var(--bg); color:var(--text); }
   header { padding:12px 18px; background:#fff; border-bottom:1px solid var(--line); display:flex; gap:8px; align-items:center; flex-wrap:wrap; position:sticky; top:0; z-index:5; }
   header h1 { font-size:15px; margin:0 8px 0 0; font-weight:700; }
+  .title-search { display:flex; gap:8px; }
   input, button, select, textarea { font:inherit; color:var(--text); background:#fff; border:1px solid var(--line); border-radius:8px; padding:7px 10px; }
   input::placeholder { color:var(--muted); }
   button { cursor:pointer; background:#fff; }
@@ -20,6 +21,31 @@
   button.primary { background:var(--accent); border-color:var(--accent); color:#fff; }
   button.primary:hover { filter:brightness(1.05); }
   .hidden { display:none !important; }
+
+  .activity { position:relative; display:grid; grid-template-columns:36px minmax(0,1fr) auto 28px; gap:11px; align-items:center;
+    margin:12px 16px 0; padding:13px 14px 15px; overflow:hidden; border:1px solid #c7d2fe; border-radius:12px;
+    background:linear-gradient(100deg,#fff 0%,#f5f6ff 100%); box-shadow:0 5px 18px rgba(79,70,229,.10); }
+  .activity-symbol { width:36px; height:36px; display:grid; place-items:center; border-radius:10px; background:#e9eafe; color:var(--accent); }
+  .activity-spinner { width:18px; height:18px; border:2px solid #c7cafb; border-top-color:var(--accent); border-radius:50%; animation:activity-spin .8s linear infinite; }
+  .activity-result { display:none; font-size:20px; font-weight:800; }
+  .activity-copy { min-width:0; }
+  .activity-copy strong { display:block; margin-bottom:2px; font-size:13px; }
+  .activity-copy span { display:block; color:#667085; font-size:12px; line-height:1.4; }
+  .activity-elapsed { color:#667085; font-size:11px; font-variant-numeric:tabular-nums; white-space:nowrap; }
+  .activity-close { padding:2px; border:0; background:transparent; color:#7c8798; font-size:20px; line-height:1; }
+  .activity-close:hover { background:transparent; color:var(--text); }
+  .activity-progress { position:absolute; inset:auto 0 0; height:3px; overflow:hidden; background:#e6e8ff; }
+  .activity-progress::after { content:""; position:absolute; width:32%; height:100%; border-radius:999px; background:var(--accent); animation:activity-progress 1.35s ease-in-out infinite; }
+  .activity.success { border-color:#b7e4c7; background:linear-gradient(100deg,#fff 0%,#f0fff5 100%); box-shadow:0 5px 18px rgba(47,158,68,.09); }
+  .activity.success .activity-symbol { background:#def7e7; color:#2f9e44; }
+  .activity.error { border-color:#f5c2cc; background:linear-gradient(100deg,#fff 0%,#fff4f6 100%); box-shadow:0 5px 18px rgba(214,51,108,.08); }
+  .activity.error .activity-symbol { background:#fde8ec; color:#d6336c; }
+  .activity.success .activity-spinner, .activity.error .activity-spinner, .activity.success .activity-progress, .activity.error .activity-progress { display:none; }
+  .activity.success .activity-result, .activity.error .activity-result { display:block; }
+  .activity.success .activity-result::before { content:"✓"; }
+  .activity.error .activity-result::before { content:"!"; }
+  @keyframes activity-spin { to { transform:rotate(360deg); } }
+  @keyframes activity-progress { from { left:-32%; } to { left:100%; } }
 
   #auth-page { min-height:100vh; display:grid; place-items:center; padding:28px 16px; background:linear-gradient(145deg,#f8faff 0%,#eef2ff 100%); }
   .auth-shell { width:100%; max-width:410px; }
@@ -96,6 +122,8 @@
   @media (max-width: 720px) {
     header { padding:10px 12px; }
     header h1 { flex-basis:100%; }
+    .title-search { flex:1 1 100%; }
+    .title-search input { min-width:0; flex:1; }
     #board { overflow-x:auto; gap:8px; padding:12px; -webkit-overflow-scrolling:touch; }
     .col { flex:0 0 84%; min-width:240px; }
     .col.collapsed { flex:0 0 40px; min-width:40px; }
@@ -104,6 +132,8 @@
     .row2 { flex-direction:column; gap:0; }
     .auth-card { padding:20px; }
     .auth-actions { grid-template-columns:1fr; }
+    .activity { grid-template-columns:36px minmax(0,1fr) 28px; margin:10px 12px 0; }
+    .activity-elapsed { display:none; }
   }
   .sec { margin-top:18px; }
   .sec > .sec-head { display:flex; align-items:center; justify-content:space-between; margin-bottom:8px; }
@@ -142,8 +172,10 @@
 <div id="app-page" class="hidden">
 <header>
   <h1>Tailr</h1>
-  <input id="q" placeholder="search" size="14">
-  <button onclick="load()">Apply</button>
+  <form class="title-search" onsubmit="event.preventDefault(); searchByTitle();">
+    <input id="q" placeholder="Job title, e.g. HRBP" size="18" aria-label="Job title">
+    <button id="search-jobs" type="submit">Search jobs</button>
+  </form>
   <button class="primary" id="refresh-jobs" onclick="matchForMe()">↻ Refresh jobs</button>
   <button onclick="openResume()">📄 Resume</button>
   <button onclick="openPrefs()">⚙ Preferences</button>
@@ -153,6 +185,13 @@
     <button onclick="logout()">Log out</button>
   </span>
 </header>
+<div id="activity" class="activity hidden" role="status" aria-live="polite">
+  <div class="activity-symbol" aria-hidden="true"><span class="activity-spinner"></span><span class="activity-result"></span></div>
+  <div class="activity-copy"><strong id="activity-title"></strong><span id="activity-detail"></span></div>
+  <span class="activity-elapsed" id="activity-elapsed"></span>
+  <button class="activity-close" type="button" onclick="hideActivity()" aria-label="Dismiss status" title="Dismiss">×</button>
+  <div class="activity-progress" aria-hidden="true"></div>
+</div>
 <div id="board"></div>
 <div id="empty" style="display:none;color:var(--muted);padding:24px;line-height:1.7;">
   <b style="color:var(--text)">Your board is empty — nothing has been scored for you yet.</b><br>
@@ -227,6 +266,44 @@ const errorDetail = (body, fallback) => typeof body?.detail === "string"
 const esc = s => (s || "").replace(/&/g,"&amp;").replace(/</g,"&lt;").replace(/>/g,"&gt;").replace(/"/g,"&quot;");
 const scoreColor = s => s >= 75 ? "#e4f7ec;color:#2f9e44" : s >= 60 ? "#fdf1dc;color:#b0812a" : "#fde8ec;color:#d6336c";
 let dragId = null;
+let activityTicker = null;
+let activityStartedAt = 0;
+
+function hideActivity() {
+  $("activity").classList.add("hidden");
+}
+
+function activityTime() {
+  const seconds = Math.max(0, Math.floor((Date.now() - activityStartedAt) / 1000));
+  return seconds < 60 ? `${seconds}s` : `${Math.floor(seconds / 60)}m ${seconds % 60}s`;
+}
+
+function startActivity(title) {
+  clearInterval(activityTicker);
+  activityStartedAt = Date.now();
+  $("activity").className = "activity";
+  $("activity").setAttribute("aria-busy", "true");
+  $("activity-title").textContent = title;
+  $("activity-detail").textContent = "Searching job sources and screening matches. You can keep using Tailr.";
+  $("activity-elapsed").textContent = "0s";
+  activityTicker = setInterval(() => {
+    const elapsed = activityTime();
+    $("activity-elapsed").textContent = elapsed;
+    if (Date.now() - activityStartedAt > 20000) {
+      $("activity-detail").textContent = "Still working — some job sources take a little longer. You can keep using Tailr.";
+    }
+  }, 1000);
+}
+
+function finishActivity(state, title, detail) {
+  clearInterval(activityTicker);
+  activityTicker = null;
+  $("activity").className = `activity ${state}`;
+  $("activity").setAttribute("aria-busy", "false");
+  $("activity-title").textContent = title;
+  $("activity-detail").textContent = detail;
+  $("activity-elapsed").textContent = activityTime();
+}
 
 // ---- auth ---------------------------------------------------------------
 const TOKEN_KEY = "tailr_token";
@@ -311,6 +388,9 @@ async function submitAuth() {
 }
 
 function logout(message = "") {
+  clearInterval(activityTicker);
+  activityTicker = null;
+  hideActivity();
   token = "";
   localStorage.removeItem(TOKEN_KEY);
   $("whoami").textContent = "";
@@ -410,30 +490,45 @@ async function move(id, status) {
   dragId = null;
   load();
 }
-async function matchForMe(prefix = "") {
-  const button = $("refresh-jobs");
-  button.disabled = true;
-  setStatus(prefix + "looking for fresh jobs and matching…");
+async function searchByTitle() {
+  const title = $("q").value.trim();
+  if (!title) {
+    await load();
+    return;
+  }
+  await matchForMe(false, title);
+}
+
+async function matchForMe(afterPreferenceSave = false, searchTitle = "") {
+  const buttons = [$("refresh-jobs"), $("search-jobs")];
+  buttons.forEach(button => { button.disabled = true; });
+  const activityTitle = searchTitle
+    ? `Searching for “${searchTitle}”`
+    : afterPreferenceSave ? "Preferences saved — finding jobs" : "Refreshing your job matches";
+  startActivity(activityTitle);
   try {
-    const response = await api("/jobs/refresh", { method:"POST" });
+    const response = await api(searchTitle ? "/jobs/search" : "/jobs/refresh", searchTitle
+      ? { method:"POST", headers:{"Content-Type":"application/json"}, body:JSON.stringify({ title:searchTitle }) }
+      : { method:"POST" });
     const r = await response.json().catch(() => ({}));
     if (!response.ok) {
-      setStatus(errorDetail(r, "job refresh failed (" + response.status + ")"));
+      finishActivity("error", "Refresh could not be completed", errorDetail(r, "Please try again in a moment."));
       return;
     }
     await load();
     const fetchMessage = r.fetch_status === "fetched"
-      ? `found ${r.new_jobs} new jobs; `
+      ? `Found ${r.new_jobs} new ${r.new_jobs === 1 ? "job" : "jobs"} and screened ${r.screened}.`
       : r.fetch_status === "daily_limit"
-        ? "fresh jobs already checked today; "
+        ? `Fresh sources were already checked today; screened ${r.screened} available ${r.screened === 1 ? "job" : "jobs"}.`
         : r.fetch_status === "not_configured"
-          ? "fresh-job source unavailable; "
-          : "";
-    setStatus(`${prefix}${fetchMessage}screened ${r.screened} of ${r.candidates} matching jobs`);
+          ? `Matched the existing job pool and screened ${r.screened} ${r.screened === 1 ? "job" : "jobs"}.`
+          : `Screened ${r.screened} ${r.screened === 1 ? "job" : "jobs"}.`;
+    const resultTitle = searchTitle ? `Matches for “${searchTitle}” are ready` : "Your job matches are ready";
+    finishActivity("success", resultTitle, `${fetchMessage} ${lastJobs.length} ${lastJobs.length === 1 ? "job is" : "jobs are"} on your board.`);
   } catch {
-    if (token) setStatus(prefix + "job refresh could not be completed");
+    if (token) finishActivity("error", "Refresh could not be completed", "Your board is unchanged. Please try again.");
   } finally {
-    button.disabled = false;
+    buttons.forEach(button => { button.disabled = false; });
   }
 }
 
@@ -662,7 +757,7 @@ async function savePrefs() {
   const res = await api("/profile/preferences", { method:"PUT", headers:{"Content-Type":"application/json"}, body:JSON.stringify(preferences) });
   if (!res.ok) { $("prefs-status").textContent = "save failed (" + res.status + ")"; return; }
   closePrefs();
-  await matchForMe("preferences saved; ");
+  await matchForMe(true);
 }
 
 boot();
